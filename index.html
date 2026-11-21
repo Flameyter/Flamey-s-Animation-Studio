@@ -4821,9 +4821,13 @@
           dirty = true;
           return "";
         } },
-        mamode: { cat: "massets", shape: "cmd", tpl: "set asset mode to %1", a: [["menu", "slideshow", BK_AMODES.concat(["none", "all"]).map((m) => [m, m])]], run: (v) => {
-          const m = String(v[0]);
-          assets.forEach((a) => {
+        /* the second menu picks the asset; "all assets" (and scripts saved before it had a menu) change every asset */
+        mamode: { cat: "massets", shape: "cmd", tpl: "set asset mode to %1 for %2", a: [["menu", "slideshow", BK_AMODES.concat(["none", "all"]).map((m) => [m, m])], ["menu", "*", () => [["*", "all assets"]].concat(bkAssetList())]], run: (v) => {
+          const m = String(v[0]),
+            all = v[1] == null || v[1] === "" || v[1] === "*",
+            A = all ? null : bkAssetGet(v[1]);
+          if (!all && !A) throw new Error("pick an asset");
+          (all ? assets : [A]).forEach((a) => {
             const now = new Set(a.modes || []);
             if (m === "none") now.clear();
             else if (m === "all") BK_AMODES.forEach((k) => now.add(k));
