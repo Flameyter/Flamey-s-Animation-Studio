@@ -4111,6 +4111,31 @@
          purpose. ===== */
       /* the dropdown of characters (every character rig in Rigs / the editor) */
       const bkCharList = () => RIGS.map((r) => [String(r.id), r.name || "character"]);
+      /* a character's ID: the one blocks gave it, or its hidden number if it never got one */
+      const bkCid = (r) => (r.cid != null && r.cid !== "" ? String(r.cid) : String(r.id));
+      const bkRigByCid = (id) => {
+        const k = String(id == null ? "" : id).trim();
+        return k === "" ? null : RIGS.find((r) => bkCid(r) === k) || null;
+      };
+      /* by ID first, then by name (capitals ignored) */
+      const bkRigFind = (x) => {
+        const k = String(x == null ? "" : x).trim().toLowerCase();
+        return bkRigByCid(x) || (k && RIGS.find((r) => String(r.name || "").toLowerCase() === k)) || null;
+      };
+      const bkRigParts = () => [["bones", "bones"], ["pieces", "pieces"], ["everything", "everything"]];
+      /* hides parts in the video without touching the per-bone “Invisible bone” boxes in Rigs */
+      function bkRigHide(r, what, on) {
+        const h = { ...(r.bkInv || {}) };
+        (what === "everything" ? ["bones", "pieces"] : [what === "pieces" ? "pieces" : "bones"]).forEach((k) => (on ? (h[k] = true) : delete h[k]));
+        r.bkInv = h;
+        dirty = true;
+      }
+      function bkRigChanged() {
+        dirty = true;
+        try {
+          rgSync();
+        } catch (e) {}
+      }
       const bkAssetList = () => assets.map((a, i) => [String(i), a.n || "asset " + (i + 1)]);
       /* “in editor”: scripts that run whenever the project is open */
       let bkEdGen = 0,
@@ -4615,6 +4640,67 @@
            A character that is not on that frame also reports 0. */
         xofchar: { cat: "rigs", shape: "rep", tpl: "x of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "x") },
         yofchar: { cat: "rigs", shape: "rep", tpl: "y of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "y") },
+        /* ----- characters made and changed from Blocks -----
+           Every character has a character ID (r.cid) you can see and set from blocks. It is separate from the hidden
+           r.id the frames use, so changing it never unhooks a character from the video. Characters made with
+           “create a …” are “blocked characters” (r.bk). Ragdoll permission is only stored for now (r.ragdoll). */
+        rgcreate: { cat: "rigs", shape: "cmd", tpl: "create a %1 named: %2 id: %3 with ragdoll permissions set to %4", a: [["menu", "preset", [["preset", "preset"], ["blank", "blank"]]], ["str", ""], ["str", ""], ["menu", "true", [["true", "true"], ["false", "false"]]]], run: (v) => {
+          const name = String(v[1] == null ? "" : v[1]).trim() || "Character " + (RIGS.length + 1),
+            id = String(v[2] == null ? "" : v[2]).trim() || name;
+          if (bkRigByCid(id)) return ""; /* already made (a frame hat runs this every frame): do nothing */
+          const r = v[0] === "blank" ? newBlankRig(name) : newRig(name);
+          r.cid = id;
+          r.bk = true;
+          r.ragdoll = String(v[3]) !== "false";
+          RIGS.push(r);
+          bkRigChanged();
+          return "";
+        } },
+        rgrename: { cat: "rigs", shape: "cmd", tpl: "rename rigged character, %1 , to %2 and give id %3", a: [["str", ""], ["str", ""], ["str", ""]], run: (v) => {
+          const r = bkRigFind(v[0]);
+          if (!r) throw new Error("no character called “" + v[0] + "”");
+          const nn = String(v[1] == null ? "" : v[1]).trim(),
+            ni = String(v[2] == null ? "" : v[2]).trim();
+          if (ni && ni !== bkCid(r) && bkRigByCid(ni)) throw new Error("the ID “" + ni + "” is already taken");
+          if (nn) r.name = nn;
+          if (ni) r.cid = ni;
+          bkRigChanged();
+          return "";
+        } },
+        rgnamepre: { cat: "rigs", shape: "cmd", tpl: "name all presets %1 with id randomized and attached to set name", a: [["str", "man"]], run: (v) => {
+          const name = String(v[0] == null ? "" : v[0]).trim() || "man";
+          RIGS.filter((r) => !r.blank).forEach((r) => {
+            if (r.name === name && String(r.cid || "").startsWith(name + "-")) return; /* already done: keep its ID */
+            r.name = name;
+            let id;
+            do id = name + "-" + Math.floor(1000 + Math.random() * 9000);
+            while (bkRigByCid(id));
+            r.cid = id;
+          });
+          bkRigChanged();
+          return "";
+        } },
+        rghideall: { cat: "rigs", shape: "cmd", tpl: "make all %1 %2 in the video", a: [["menu", "bones", bkRigParts], ["menu", "invisible", [["invisible", "invisible"], ["visible", "visible"]]]], run: (v) => {
+          RIGS.forEach((r) => bkRigHide(r, v[0], v[1] !== "visible"));
+          return "";
+        } },
+        rghideone: { cat: "rigs", shape: "cmd", tpl: "make only %1 's %2 invisible in the video", a: [["menu", "", bkCharList], ["menu", "bones", bkRigParts]], run: (v) => {
+          const r = RIGS.find((q) => String(q.id) === String(v[0])) || bkRigFind(v[0]);
+          if (!r) throw new Error("pick a character");
+          bkRigHide(r, v[1], true);
+          return "";
+        } },
+        rglist: { cat: "rigs", shape: "list", tpl: "rigged characters", a: [], run: () => RIGS.map((r) => r.name || "Character") },
+        rgblist: { cat: "rigs", shape: "list", tpl: "blocked characters", a: [], run: () => RIGS.filter((r) => r.bk).map((r) => r.name || "Character") },
+        rgids: { cat: "rigs", shape: "rep", tpl: "character IDs", a: [], run: () => RIGS.map(bkCid).join(", ") },
+        rgragdoll: { cat: "rigs", shape: "cmd", tpl: "for ID Character %1 , set ragdoll permissions to %2", a: [["str", ""], ["menu", "true", [["true", "true"], ["false", "false"]]]], run: (v) => {
+          const r = bkRigByCid(v[0]);
+          if (!r) throw new Error("no character with the ID “" + v[0] + "”");
+          r.ragdoll = String(v[1]) !== "false";
+          dirty = true;
+          return "";
+        } },
+        rgidhas: { cat: "rigs", shape: "bool", tpl: "character ID %1 exists?", a: [["str", ""]], run: (v) => !!bkRigByCid(v[0]) },
         /* text: holds whatever you type in its box, as text (so 5 stays the word "5", not a number) */
         text: { cat: "operators", shape: "rep", tpl: "text %1", a: [["str", ""]], run: (v) => (v[0] == null ? "" : String(v[0])) },
         /* the hexagon: a true/false block with a box. If the box holds a number anywhere in it (the first one counts), only that number matters:
@@ -12465,7 +12551,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         const hide = rig.hide || {},
           part = (e) => {
             const g = G[e.id];
-            if (!g || e.invisible) return;
+            if (!g || e.invisible || (rig.bkInv && rig.bkInv[e.art ? "pieces" : "bones"])) return;
             const im = e.looks && e.looks.length > 1 ? e.looks[((pose.l && pose.l[e.id]) || 0) % e.looks.length] : e.img;
             if (e.shape === "image" && im && im.cv) {
               x.save();
@@ -12500,7 +12586,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           },
           extras = (front) => (rig.extra || []).filter((e) => !!e.front === front).forEach(part),
           vis = (k, fn) => {
-            if (!hide[k]) fn();
+            if (!hide[k] && !(rig.bkInv && rig.bkInv.bones)) fn();
           };
         extras(false);
         if (side) {
@@ -12530,7 +12616,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         return c;
       }
       const rgImgId = (o) => (o ? o.id || (o.id = Math.random().toString(36).slice(2, 8)) : 0);
-      const rgKey = (rig, pose, flip) => JSON.stringify([rig.id, rig.look, rig.view, flip == null ? rig.flip : flip, rig.size, rig.blank, rgImgId(rig.head), (rig.extra || []).map((e) => ({ ...e, img: rgImgId(e.img), looks: e.looks ? e.looks.map(rgImgId) : 0 })), rig.hide, pose]);
+      const rgKey = (rig, pose, flip) => JSON.stringify([rig.id, rig.look, rig.view, flip == null ? rig.flip : flip, rig.size, rig.blank, rgImgId(rig.head), (rig.extra || []).map((e) => ({ ...e, img: rgImgId(e.img), looks: e.looks ? e.looks.map(rgImgId) : 0 })), rig.hide, rig.bkInv || 0, pose]);
       function rgAsset(rig, pose, label) {
         const key = rgKey(rig, pose),
           hit = rgCache.get(key);
@@ -12934,6 +13020,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           c = rgCopy({ ...r0, head: null, extra: (r0.extra || []).map((e) => ({ ...e, img: null })) });
         c.extra.forEach((e, i) => (e.img = r0.extra[i].img));
         c.id = Date.now();
+        delete c.cid; /* a copy gets its own ID (its hidden number) */
         c.name = rg().name + " copy";
         c.head = rg().head ? { u: rg().head.u, cv: rg().head.cv } : null;
         RIGS.push(c);
@@ -13104,7 +13191,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         }
         const list = [], gone = new Set();
         for (const r of p.rigs || []) {
-          if (!r.blank) {
+          if (!r.blank && !r.bk) {
             gone.add(r.id); /* the old preset man: not kept any more */
             continue;
           }
