@@ -578,7 +578,7 @@
       .bkloop { position: absolute; right: 12px; top: 2px; color: #fff; font-size: 15px; line-height: 20px; }
       .bkslot.bool.empty { width: 46px; height: 24px; background: rgba(0, 0, 0, 0.25); clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%); border-radius: 0; }
       .bkblk.s-bool { height: 34px; padding: 0 14px; }
-      .bkblk.s-rep, .bkblk.s-list, .bkblk.s-leaf { height: 34px; padding: 0 14px; }
+      .bkblk.s-rep, .bkblk.s-list { height: 34px; padding: 0 14px; }
       .bkblk.nested { height: 28px; padding: 0 10px; font-size: 12px; gap: 4px; }
       .bkblk.inpal input, .bkblk.inpal select { pointer-events: none; }
       .bkblk input, .bkblk select { flex: none; height: 28px; padding: 0 8px; border-radius: 14px; border: 0; background: #fff; color: #222; font-size: 13px; text-align: center; }
@@ -4145,104 +4145,6 @@
           rgSync();
         } catch (e) {}
       }
-      /* fonts for the text blocks: "Clean" is the plain device font, then the built-in ones, then any added in Fonts */
-      const bkFontList = () => {
-        const out = [["sans", "Clean"]].concat(FBUILT.filter((b) => b[0] !== "sans"));
-        [...fsugList(), ...FONTS.map((f) => f.n)].forEach((n) => out.some((o) => o[0] === n) || out.push([n, n]));
-        return out;
-      };
-      /* a font typed or picked: "Clean", a built-in name ("Georgia" or "serif"), or any other font name */
-      function bkFontKey(x) {
-        const k = String(x == null ? "" : x).trim();
-        if (!k || k.toLowerCase() === "clean" || k.toLowerCase() === "device font") return "sans";
-        const b = FBUILT.find((q) => q[0] === k.toLowerCase() || q[1].toLowerCase() === k.toLowerCase());
-        return b ? b[0] : k;
-      }
-      /* a font the studio can use: "Clean" / a built-in one (gives its key), one added in Fonts, or one on this device */
-      function bkFontFind(x) {
-        const k = String(x == null ? "" : x).trim();
-        if (!k) return "";
-        const key = bkFontKey(k);
-        if (TXF[key]) return key;
-        const mine = FONTS.find((f) => f.n.toLowerCase() === k.toLowerCase());
-        if (mine) return mine.n;
-        try {
-          return fontHere(k) ? k : "";
-        } catch (e) {
-          return "";
-        }
-      }
-      /* look a font up on Google Fonts: { n: its real name, u: the font file as a data address } or null.
-         The name is tried as typed, then with capital first letters (“open sans” → “Open Sans”).
-         Answers are remembered, so a frame hat doesn’t download it again every frame. */
-      const BK_FWEB = new Map();
-      const BK_FNONE = "Search for a font then copy the name and put it into input. Font not found"; /* what “give font” says when there is no such font */
-      async function bkFontWeb(x) {
-        const k = String(x == null ? "" : x).trim().replace(/\s+/g, " ");
-        if (!k || k.length > 80) return null;
-        const key = k.toLowerCase();
-        if (BK_FWEB.has(key)) return BK_FWEB.get(key);
-        const tries = [k, k.replace(/\b\w/g, (c) => c.toUpperCase())].filter((q, i, a) => a.indexOf(q) === i);
-        let found = null;
-        for (const name of tries) {
-          let r;
-          try {
-            r = await fetch("https://fonts.googleapis.com/css2?family=" + encodeURIComponent(name).replace(/%20/g, "+"));
-          } catch (e) {
-            throw new Error("couldn’t reach the internet to search for fonts");
-          }
-          if (!r.ok) continue;
-          const css = await r.text(),
-            blocks = css.split("@font-face").slice(1),
-            pick = blocks.find((b, i) => /\/\*\s*latin\s*\*\//.test(css.split("@font-face")[i])) || blocks[blocks.length - 1] || "",
-            url = (pick.match(/url\((https:[^)]+)\)/) || [])[1],
-            real = ((pick.match(/font-family:\s*'([^']+)'/) || [])[1] || name).trim();
-          if (!url) continue;
-          let u;
-          try {
-            u = await fileURL(await (await fetch(url)).blob());
-          } catch (e) {
-            throw new Error("couldn’t download the font");
-          }
-          if (!FACES[real]) await fontAdd(real, u);
-          found = { n: real, u };
-          break;
-        }
-        BK_FWEB.set(key, found);
-        return found;
-      }
-      /* a little card showing the font, for a few seconds */
-      let bkFontCard = null;
-      function bkFontPreview(key) {
-        if (bkFontCard) bkFontCard.remove();
-        const d = document.createElement("div"),
-          b = FBUILT.find((q) => q[0] === key);
-        d.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:99999;max-width:calc(100vw - 32px);background:#fff;color:#111;border:3px solid #1fb87a;border-radius:12px;padding:10px 14px;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:none";
-        const t = document.createElement("div");
-        t.style.cssText = "font:600 12px system-ui,sans-serif;color:#1fb87a;margin-bottom:4px";
-        t.textContent = key === "sans" ? "Clean" : b ? b[1] : key;
-        const p = document.createElement("div");
-        p.style.cssText = "font-size:26px;line-height:1.25;font-family:" + txtFam(key);
-        p.textContent = "Aa Bb Cc 123";
-        d.append(t, p);
-        (document.fullscreenElement || document.body).appendChild(d);
-        bkFontCard = d;
-        setTimeout(() => d.remove(), 3000);
-      }
-      function bkFontsChanged() {
-        dirty = true;
-        try {
-          fontsFill();
-        } catch (e) {}
-      }
-      /* the frame being played (or the one open in the editor), on the layer being edited */
-      const bkTxtFrame = () => frames[(bkExp ? bkExpN : cur + 1) - 1] || null;
-      function bkTxtChanged() {
-        dirty = true;
-        try {
-          if (!playing) ui();
-        } catch (e) {}
-      }
       const bkAssetList = () => assets.map((a, i) => [String(i), a.n || "asset " + (i + 1)]);
       const BK_AMODES = ["slideshow", "static", "self-moveable", "moveable", "effect-able"];
       const bkAssetByCid = (id) => {
@@ -4747,8 +4649,6 @@
         keep: { n: "Keep", c: KEEPC, i: "📌" },
         commands: { n: "Commands", c: EVC, i: "📣" },
         function: { n: "Function", c: "#2bb0a6", i: "ƒ" },
-        etext: { n: "Edit text", c: "#66b234", i: "✍" },
-        fonts: { n: "Fonts", c: "#1fb87a", i: "🔤" },
         rigs: { n: "Rigs", c: "#ff5a2a", i: "🦴" },
         massets: { n: "Make assets", c: "#ffab19", i: "✚" },
         looks: { n: "Looks", c: "#9966ff", i: "👁" },
@@ -4877,70 +4777,6 @@
           return "";
         } },
         rgidhas: { cat: "rigs", shape: "bool", tpl: "character ID %1 exists?", a: [["str", ""]], run: (v) => !!bkRigByCid(v[0]) },
-        /* ----- Edit text blocks -----
-           A text added by a block gets an ID (t.cid). "Clean" is the plain device font (sans). */
-        etadd: { cat: "etext", shape: "cmd", tpl: "add text named %1 id %2 font %3", a: [["str", ""], ["str", ""], ["menu", "sans", bkFontList]], run: (v) => {
-          const words = String(v[0] == null ? "" : v[0]);
-          if (!words.trim()) throw new Error("type the words for the text");
-          const id = String(v[1] == null ? "" : v[1]).trim() || words.trim(),
-            f = bkTxtFrame();
-          if (!f) return "";
-          if (f.texts.some((t) => t.cid === id)) return ""; /* already on this frame (a frame hat runs this every frame) */
-          f.texts.push({ s: words, x: Math.round(CW / 2), y: Math.round(50 + ((f.texts.length * 40) % Math.max(40, CH - 100))), ff: bkFontKey(v[2]), cid: id });
-          bkTxtChanged();
-          return "";
-        } },
-        etfont: { cat: "etext", shape: "cmd", tpl: "set font to %1 for text %2", a: [["str", "Clean"], ["str", ""]], run: (v) => {
-          const k = String(v[1] == null ? "" : v[1]).trim();
-          if (!k) throw new Error("type the text’s ID");
-          const ff = bkFontKey(v[0]);
-          let n = 0;
-          /* by ID on every frame; if no text has that ID, by its words */
-          for (const by of ["cid", "s"]) {
-            LAY.forEach((L) => (L.k || []).forEach((f) => (f.texts || []).forEach((t) => {
-              if (String(t[by] == null ? "" : t[by]).trim() === k) ((t.ff = ff), n++);
-            })));
-            if (n) break;
-          }
-          if (!n) throw new Error("no text called “" + k + "”");
-          bkTxtChanged();
-          return "";
-        } },
-        /* ----- Fonts blocks -----
-           the leaf-shaped “give font” block searches the internet (Google Fonts) for the font, gives its name back
-           (or BK_FNONE if there is no such font) and, when you tap it, shows a preview of it. Drop it into
-           “make font from” to add that font to your Fonts list. */
-        fogive: { cat: "fonts", shape: "leaf", tpl: "give font %1 and search if font exists", a: [["str", ""]], run: async (v) => {
-          const f = await bkFontWeb(v[0]);
-          if (f && !playing) bkFontPreview(f.n);
-          return f ? f.n : BK_FNONE;
-        } },
-        fosay: { cat: "fonts", shape: "rep", tpl: "say \"font\" %1 times", a: [["num", "3"]], run: (v) => {
-          const n = Math.max(0, Math.min(1000, Math.floor(bkNum(v[0])) || 0));
-          return Array(n).fill("font").join(" ");
-        } },
-        fomake: { cat: "fonts", shape: "cmd", tpl: "make font from %1", a: [["str", ""]], run: async (v) => {
-          const f = v[0] === false || v[0] === BK_FNONE ? null : await bkFontWeb(v[0]);
-          if (!f) throw new Error("that font doesn’t exist");
-          if (FONTS.some((q) => q.n === f.n)) return ""; /* already in your list */
-          FONTS.push({ n: f.n, u: f.u }); /* the font file goes inside the project, so it still works offline */
-          bkFontsChanged();
-          return "";
-        } },
-        fodel: { cat: "fonts", shape: "cmd", tpl: "delete font %1", a: [["str", ""]], run: (v) => {
-          const k = String(v[0] == null || v[0] === false ? "" : v[0]).trim(),
-            f = FONTS.find((q) => q.n.toLowerCase() === k.toLowerCase());
-          if (!f) throw new Error(bkFontFind(k) ? "only fonts you added can be deleted" : "no font called “" + k + "”");
-          FONTS = FONTS.filter((q) => q !== f);
-          if (FACES[f.n]) {
-            try {
-              document.fonts.delete(FACES[f.n]);
-            } catch (e) {}
-            delete FACES[f.n];
-          }
-          bkFontsChanged();
-          return "";
-        } },
         /* ----- Make assets blocks -----
            a.bk: made by a block; a.ma: saved in Make assets; a.kind: hitbox / floor / object; a.cid: its ID;
            a.modes: list of modes (only slideshow does something so far); a.physics: stored for later;
@@ -5601,7 +5437,7 @@
       };
       const bkShape = (b) => BLK[b.t].shape;
       /* round, square and pointed blocks give back a value and cannot stack; caps end a script */
-      const bkIsRep = (b) => ["rep", "list", "bool", "leaf"].includes(bkShape(b));
+      const bkIsRep = (b) => ["rep", "list", "bool"].includes(bkShape(b));
       const bkIsCap = (b) => bkShape(b) === "cap";
       /* BKS = stacks: [{ x, y, b: [{ t, v }] }]. v holds the typed values, or { r: block } for a block plugged in. */
       let BKS = [];
@@ -5829,11 +5665,6 @@
         if (shape === "rep") {
           const q = h / 2;
           return "M" + q + ",0 L" + (w - q) + ",0 A" + q + "," + q + " 0 0 1 " + (w - q) + "," + h + " L" + q + "," + h + " A" + q + "," + q + " 0 0 1 " + q + ",0 Z";
-        }
-        /* leaf: a font block (round top-right and bottom-left corners, small ones on the other two) */
-        if (shape === "leaf") {
-          const q = h / 2;
-          return "M" + r + ",0 L" + (w - q) + ",0 A" + q + "," + q + " 0 0 1 " + w + "," + q + " L" + w + "," + (h - r) + " Q" + w + "," + h + " " + (w - r) + "," + h + " L" + q + "," + h + " A" + q + "," + q + " 0 0 1 0," + q + " L0," + r + " Q0,0 " + r + ",0 Z";
         }
         if (shape === "bool") {
           const q = h / 2;
