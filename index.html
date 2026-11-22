@@ -2073,6 +2073,7 @@
             <li><b>animation.gif</b> · the project as a gif</li>
             <li><b>assets/</b> · every asset as a picture (assets that came from an SVG stay SVG)</li>
             <li><b>sound/</b> · your sound files, only if there is sound</li>
+            <li><b>Flamey's Animation Studio.html</b> · a free copy of the studio (the newest one from the website) that works with no internet</li>
           </ul>
           <div class="row">
             <label class="up">Add your own files<input type="file" id="zextra" multiple hidden /></label
@@ -11058,6 +11059,22 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
               data: f.data,
             }),
           );
+          /* a free copy of the studio itself: this page as it is on the website (always the newest one) */
+          say("Packing a copy of the studio…");
+          const STUDIO_URL = "https://flameyter.github.io/Flamey-s-Animation-Studio/";
+          let studio = null;
+          for (const u of [/^https?:/.test(location.protocol) ? location.href.split("#")[0] : null, STUDIO_URL].filter(Boolean)) {
+            try {
+              const r = await fetch(u, { cache: "no-cache" });
+              const t = r.ok ? await r.text() : "";
+              if (/<html/i.test(t) && /Animation Studio/.test(t)) {
+                studio = t;
+                break;
+              }
+            } catch (e) {}
+          }
+          if (studio) files.push({ name: uniq("", "Flamey's Animation Studio", ".html"), data: enc.encode(studio) });
+          else extra.push("Studio copy: couldn’t get it (it needs the internet), so none was packed.");
           files.splice(1, 0, { name: uniq("", "info", ".txt"), data: enc.encode(infoText(extra)) });
           await save(pfile(".zip"), makeZip(files));
           say(files.length + " files packed. " + $("emsg").textContent + (extra.length ? " " + extra.join(" ") : ""));
