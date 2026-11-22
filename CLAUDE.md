@@ -2,6 +2,11 @@
 
 One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB). All scripts are inline `<script>` tags. Joel (the owner) works in HTML5 canvas and browser formats and likes direct, short feedback.
 
+## Where the studio lives
+- Website (GitHub Pages, updates by itself from `main`): https://flameyter.github.io/Flamey-s-Animation-Studio/
+- itch.io page: https://flameyter.itch.io/flameys-animation-studio (upload `itch/flamey-studio-itch.zip` once; it shows the website)
+- Joel's YouTube channel: **Flamey :)**, https://www.youtube.com/@CrazyPWAF (about 2.65K subscribers). Videos made in the studio go here.
+
 ## Checking your work
 - Syntax: pull the inline scripts out into one file and run `node --check` on it.
 - Behaviour: Playwright (chromium) against the file. Call `bkEval({t:'blockname', v:[...]})` directly. To draw a block: `bkBlockEl({t, v}, {palette:true})` into a div, then screenshot.
