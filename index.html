@@ -4176,6 +4176,7 @@
          The name is tried as typed, then with capital first letters (“open sans” → “Open Sans”).
          Answers are remembered, so a frame hat doesn’t download it again every frame. */
       const BK_FWEB = new Map();
+      const BK_FNONE = "Search for a font then copy the name and put it into input. Font not found"; /* what “give font” says when there is no such font */
       async function bkFontWeb(x) {
         const k = String(x == null ? "" : x).trim().replace(/\s+/g, " ");
         if (!k || k.length > 80) return null;
@@ -4907,19 +4908,19 @@
         } },
         /* ----- Fonts blocks -----
            the leaf-shaped “give font” block searches the internet (Google Fonts) for the font, gives its name back
-           (or false if there is no such font) and, when you tap it, shows a preview of it. Drop it into
+           (or BK_FNONE if there is no such font) and, when you tap it, shows a preview of it. Drop it into
            “make font from” to add that font to your Fonts list. */
         fogive: { cat: "fonts", shape: "leaf", tpl: "give font %1 and search if font exists", a: [["str", ""]], run: async (v) => {
           const f = await bkFontWeb(v[0]);
           if (f && !playing) bkFontPreview(f.n);
-          return f ? f.n : false;
+          return f ? f.n : BK_FNONE;
         } },
         fosay: { cat: "fonts", shape: "rep", tpl: "say \"font\" %1 times", a: [["num", "3"]], run: (v) => {
           const n = Math.max(0, Math.min(1000, Math.floor(bkNum(v[0])) || 0));
           return Array(n).fill("font").join(" ");
         } },
         fomake: { cat: "fonts", shape: "cmd", tpl: "make font from %1", a: [["str", ""]], run: async (v) => {
-          const f = v[0] === false ? null : await bkFontWeb(v[0]);
+          const f = v[0] === false || v[0] === BK_FNONE ? null : await bkFontWeb(v[0]);
           if (!f) throw new Error("that font doesn’t exist");
           if (FONTS.some((q) => q.n === f.n)) return ""; /* already in your list */
           FONTS.push({ n: f.n, u: f.u }); /* the font file goes inside the project, so it still works offline */
