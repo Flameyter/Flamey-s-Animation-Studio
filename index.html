@@ -4145,6 +4145,27 @@
           rgSync();
         } catch (e) {}
       }
+      /* fonts for the text blocks: "Clean" is the plain device font, then the built-in ones, then any added in Fonts */
+      const bkFontList = () => {
+        const out = [["sans", "Clean"]].concat(FBUILT.filter((b) => b[0] !== "sans"));
+        [...fsugList(), ...FONTS.map((f) => f.n)].forEach((n) => out.some((o) => o[0] === n) || out.push([n, n]));
+        return out;
+      };
+      /* a font typed or picked: "Clean", a built-in name ("Georgia" or "serif"), or any other font name */
+      function bkFontKey(x) {
+        const k = String(x == null ? "" : x).trim();
+        if (!k || k.toLowerCase() === "clean" || k.toLowerCase() === "device font") return "sans";
+        const b = FBUILT.find((q) => q[0] === k.toLowerCase() || q[1].toLowerCase() === k.toLowerCase());
+        return b ? b[0] : k;
+      }
+      /* the frame being played (or the one open in the editor), on the layer being edited */
+      const bkTxtFrame = () => frames[(bkExp ? bkExpN : cur + 1) - 1] || null;
+      function bkTxtChanged() {
+        dirty = true;
+        try {
+          if (!playing) ui();
+        } catch (e) {}
+      }
       const bkAssetList = () => assets.map((a, i) => [String(i), a.n || "asset " + (i + 1)]);
       const BK_AMODES = ["slideshow", "static", "self-moveable", "moveable", "effect-able"];
       const bkAssetByCid = (id) => {
@@ -4649,6 +4670,7 @@
         keep: { n: "Keep", c: KEEPC, i: "📌" },
         commands: { n: "Commands", c: EVC, i: "📣" },
         function: { n: "Function", c: "#2bb0a6", i: "ƒ" },
+        etext: { n: "Edit text", c: "#66b234", i: "✍" },
         rigs: { n: "Rigs", c: "#ff5a2a", i: "🦴" },
         massets: { n: "Make assets", c: "#ffab19", i: "✚" },
         looks: { n: "Looks", c: "#9966ff", i: "👁" },
@@ -4777,6 +4799,35 @@
           return "";
         } },
         rgidhas: { cat: "rigs", shape: "bool", tpl: "character ID %1 exists?", a: [["str", ""]], run: (v) => !!bkRigByCid(v[0]) },
+        /* ----- Edit text blocks -----
+           A text added by a block gets an ID (t.cid). "Clean" is the plain device font (sans). */
+        etadd: { cat: "etext", shape: "cmd", tpl: "add text named %1 id %2 font %3", a: [["str", ""], ["str", ""], ["menu", "sans", bkFontList]], run: (v) => {
+          const words = String(v[0] == null ? "" : v[0]);
+          if (!words.trim()) throw new Error("type the words for the text");
+          const id = String(v[1] == null ? "" : v[1]).trim() || words.trim(),
+            f = bkTxtFrame();
+          if (!f) return "";
+          if (f.texts.some((t) => t.cid === id)) return ""; /* already on this frame (a frame hat runs this every frame) */
+          f.texts.push({ s: words, x: Math.round(CW / 2), y: Math.round(50 + ((f.texts.length * 40) % Math.max(40, CH - 100))), ff: bkFontKey(v[2]), cid: id });
+          bkTxtChanged();
+          return "";
+        } },
+        etfont: { cat: "etext", shape: "cmd", tpl: "set font to %1 for text %2", a: [["str", "Clean"], ["str", ""]], run: (v) => {
+          const k = String(v[1] == null ? "" : v[1]).trim();
+          if (!k) throw new Error("type the text’s ID");
+          const ff = bkFontKey(v[0]);
+          let n = 0;
+          /* by ID on every frame; if no text has that ID, by its words */
+          for (const by of ["cid", "s"]) {
+            LAY.forEach((L) => (L.k || []).forEach((f) => (f.texts || []).forEach((t) => {
+              if (String(t[by] == null ? "" : t[by]).trim() === k) ((t.ff = ff), n++);
+            })));
+            if (n) break;
+          }
+          if (!n) throw new Error("no text called “" + k + "”");
+          bkTxtChanged();
+          return "";
+        } },
         /* ----- Make assets blocks -----
            a.bk: made by a block; a.ma: saved in Make assets; a.kind: hitbox / floor / object; a.cid: its ID;
            a.modes: list of modes (only slideshow does something so far); a.physics: stored for later;
