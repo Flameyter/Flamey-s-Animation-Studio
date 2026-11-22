@@ -256,6 +256,11 @@
       input[type="range"] {
         padding: 0;
       }
+      input[type="checkbox"],
+      input[type="radio"] {
+        flex: none;
+        width: auto;
+      }
       .sl {
         flex: 1 1 130px;
         font-size: 12px;
@@ -1586,12 +1591,13 @@
               <li>Add a frame with <b>+ Keyframe (copy)</b>, move things a little, and repeat.</li>
               <li><b>Watch video</b> plays it. <b>Export</b> or <b>Zipper</b> saves it.</li>
             </ol>
+            <div class="lbl">On a keyboard: <b>Space</b> plays and stops, <b>← →</b> change frames, <b>Ctrl + Z</b> undoes, and <b>?</b> shows every shortcut. A green <b>Saved ✓</b> in the corner means your work is saved.</div>
           </details>
           <details>
             <summary>▶ Watch video</summary>
             <ul class="zlist">
               <li>Preview your animation on the playback screen.</li>
-              <li>Use the flag button to mark the current playback position, and the stop button to stop playback.</li>
+              <li>It starts playing when you open it. The buttons are the same on every page: <b>⏮</b> first frame, <b>‹</b> back one, <b>▶ / ❚❚</b> play and stop, <b>›</b> forward one, <b>⏭</b> last frame.</li>
               <li>Use Edit video to make changes, then return here to watch the updated animation.</li>
             </ul>
           </details>
@@ -1621,7 +1627,7 @@
             <ul class="zlist">
               <li><b>This slot was deleted.</b> It isn’t in the menu anymore. It’s listed here so you remember it existed.</li>
               <li>It let you put each sound in its own box, give it a frame to start on and a frame to end on, and step through the animation hearing just that frame.</li>
-              <li>You can still place sounds on frames in the <b>Audio</b> slot: upload as many as you like, and set <b>Starts at frame</b> and <b>Ends at frame</b> (decimals work).</li>
+              <li>You can still place sounds on frames in the <b>Audio</b> slot: drag them on its timeline, or type <b>Starts at frame</b> and <b>Ends at frame</b> (decimals work).</li>
             </ul>
           </details>
           <details>
@@ -1693,7 +1699,7 @@
                 frame.
               </li>
               <li>
-                <b>Timeline</b>: ⏮ ‹ ▶ › ⏭ move through frames. <b>Onion</b> shows the last frame faintly.
+                <b>Timeline</b>: ⏮ ‹ ▶ › ⏭ move through frames. Under them, every layer has its own row of frames (the top row is in front) and every sound is a purple bar. A filled dot means that frame has something on it. Tap a dot to go to that frame on that layer, or a sound to jump to where it starts. <b>Onion</b> shows the last frame faintly.
                 <b>FPS</b> is the speed.
               </li>
               <li><b>Layers</b>: the top of the list is in front. 👁 hides a layer.</li>
@@ -1770,11 +1776,13 @@
           <details>
             <summary>🎙 Audio</summary>
             <ul class="zlist">
+              <li><b>● Record voice</b> or <b>Upload audio</b> (up to 2 minutes each).</li>
               <li>
-                <b>● Record voice</b> or <b>Upload audio</b>. Each sound has a <b>Starts at frame</b> box and a
-                <b>Volume</b> slider.
+                <b>Timeline</b> (under the video): every sound is a purple bar. Drag a bar to move where it starts, drag its
+                right edge to make it end sooner, and tap the frame numbers to jump there. The grey line is where the video ends.
               </li>
-              <li><b>▶ Play from start</b> plays the video with its sound.</li>
+              <li>Below that, each sound also has <b>Preview</b>, <b>Starts at frame</b>, <b>Ends at frame</b>, <b>Volume</b> and <b>Delete</b>.</li>
+              <li><b>▶</b> plays the video with its sound. A sound longer than the video plays all the way through before it starts again.</li>
             </ul>
           </details>
           <details>
@@ -1796,6 +1804,15 @@
             <ul class="zlist">
               <li>Pack the project, video, GIF, frames, assets, sound (if any) and an info.txt file into one .zip archive.</li>
               <li>You can also open a .zip archive and load a project from it.</li>
+            </ul>
+          </details>
+          <details>
+            <summary>🧩 Extensions</summary>
+            <ul class="zlist">
+              <li>Extras you can add to the studio. Tap one to see its picture, what it does and what it costs, then add it.</li>
+              <li>An extension can make a <b>new slot</b> on the main menu (like <b>Export</b> or <b>Blocks</b>), or be an <b>add-on</b> that works inside the slots you already have (like <b>Upgrades</b>).</li>
+              <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
+              <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
             </ul>
           </details>
           <details>
@@ -2144,7 +2161,7 @@
         <div class="pn">
           <div class="ph">Props · tap to add</div>
           <div class="lib" id="scprops"></div>
-          <label class="row"><input type="checkbox" id="scplace" checked style="width: auto" /> Also put it on this frame</label>
+          <label class="row" style="justify-content: flex-start; gap: 8px; align-items: center"><input type="checkbox" id="scplace" checked style="width: auto; flex: none; margin: 0" /> Also put it on this frame</label>
         </div>
         <div id="scmsg"></div>
       </div>
@@ -11895,9 +11912,11 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         });
         if (!AUD.length) {
           const o = document.createElement("option");
+          o.value = "0"; /* so the menu really shows this line */
           o.textContent = "No voices yet. Record or upload one.";
           sl.appendChild(o);
         }
+        sl.disabled = $("voname").disabled = !AUD.length;
         voIdx = Math.min(voIdx, Math.max(0, AUD.length - 1));
         sl.value = voIdx;
         $("voname").value = AUD[voIdx] ? AUD[voIdx].n : "";
