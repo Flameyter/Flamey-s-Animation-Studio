@@ -12782,7 +12782,11 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           x.stroke();
         }
       }
-      function rgDrawFig(x, rig, pose) {
+      /* inRigs: drawn on the Rigs stage (bones always show there). Everywhere else (Edit video, Watch, exports,
+         thumbnails) bones are invisible as soon as the character has at least one piece, so only the skin shows;
+         a character that is only bones still shows its bones, so it never disappears. */
+      function rgDrawFig(x, rig, pose, inRigs) {
+        const bonesOff = !inRigs && (rig.extra || []).some((e) => e.art);
         const L = rig.look,
           G = rgSkel(rig, pose),
           side = (pose.view || rig.view) === "side",
@@ -12928,7 +12932,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         const hide = rig.hide || {},
           part = (e) => {
             const g = G[e.id];
-            if (!g || e.invisible) return;
+            if (!g || e.invisible || (bonesOff && !e.art)) return;
             const im = e.looks && e.looks.length > 1 ? e.looks[((pose.l && pose.l[e.id]) || 0) % e.looks.length] : e.img;
             if (e.shape === "image" && im && im.cv) {
               x.save();
@@ -13019,7 +13023,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         x.translate(RG_CX, RG_CY);
         x.scale(fl * RG_S, RG_S);
         x.translate(pose.dx || 0, 0);
-        const G = rgDrawFig(x, rig, pose);
+        const G = rgDrawFig(x, rig, pose, true);
         x.restore();
         if (rig.blank) {
           x.save();
