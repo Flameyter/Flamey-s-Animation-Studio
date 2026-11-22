@@ -1115,7 +1115,8 @@
       <div class="v v-watch" hidden>
         <canvas id="wc" width="640" height="360"></canvas>
         <div class="row">
-          <button class="g flag" id="wflag">⚑</button><button class="r flag" id="wstop">■</button><b id="wfl"></b>
+          <button id="wfirst">⏮</button><button id="wprev">‹</button><button id="wflag" class="g">▶</button
+          ><button id="wnext">›</button><button id="wlast">⏭</button><b id="wfl"></b>
         </div>
       </div>
 
@@ -1282,8 +1283,8 @@
       <div class="v v-effects" hidden>
         <canvas id="fxc" width="640" height="360"></canvas>
         <div class="row">
-          <button id="fxprev">‹</button><b id="fxfl">1 / 1</b><button id="fxnext">›</button
-          ><button id="fxplay" class="g">▶</button>
+          <button id="fxfirst">⏮</button><button id="fxprev">‹</button><button id="fxplay" class="g">▶</button
+          ><button id="fxnext">›</button><button id="fxlast">⏭</button><b id="fxfl">1 / 1</b>
         </div>
         <div class="pn">
           <div class="ph">Add an effect</div>
@@ -1440,7 +1441,8 @@
       <div class="v v-audio" hidden>
         <canvas id="ac" width="640" height="360"></canvas>
         <div class="row">
-          <button id="aplay" class="g">▶ Play from start</button><button id="astop" class="r">■</button>
+          <button id="afirst">⏮</button><button id="aprev">‹</button><button id="aplay" class="g">▶</button
+          ><button id="anext">›</button><button id="alast">⏭</button><b id="afl">1 / 1</b>
         </div>
         <div class="pn atlp">
           <div class="ph">Timeline</div>
@@ -2993,8 +2995,8 @@
         el.scrollLeft = x < keep + 96 || x > keep + el.clientWidth - TLW ? x - el.clientWidth / 2 : keep;
       }
       function ui() {
-        $("fl").textContent = $("wfl").textContent = $("fxfl").textContent = cur + 1 + " / " + frames.length;
-        $("play").textContent = $("fxplay").textContent = $("camplay").textContent = playing ? "❚❚" : "▶";
+        $("fl").textContent = $("wfl").textContent = $("fxfl").textContent = $("afl").textContent = cur + 1 + " / " + frames.length;
+        $("play").textContent = $("fxplay").textContent = $("camplay").textContent = $("wflag").textContent = $("aplay").textContent = playing ? "❚❚" : "▶";
         const it = F().items[sel];
         szUi(it);
         $("arot").value = it ? it.r : 0;
@@ -3053,11 +3055,15 @@
         if (playing) setPlay(true);
       };
       $("play").onclick = () => setPlay(!playing);
-      $("wflag").onclick = () => {
-        cur = 0;
-        setPlay(true);
+      /* every page's play row works the same: ⏮ first · ‹ back · ▶ play / ❚❚ stop · › next · ⏭ last */
+      const pcRow = (pre, play) => {
+        $(pre + "first").onclick = () => nav(0);
+        $(pre + "prev").onclick = () => nav(cur - 1);
+        $(play || pre + "play").onclick = () => setPlay(!playing);
+        $(pre + "next").onclick = () => nav(cur + 1);
+        $(pre + "last").onclick = () => nav(frames.length - 1);
       };
-      $("wstop").onclick = () => setPlay(false);
+      pcRow("w", "wflag");
       const clone = (f) => {
         const n = { items: f.items.map(qCopy), texts: f.texts.map((t) => ({ ...t })), layer: null, tw: !!f.tw };
         if (f.layer) {
@@ -8781,11 +8787,7 @@
         if (!atlDrag && atlKey() !== atlSig) atlDraw();
         else if (box.__ph) box.__ph();
       })();
-      $("aplay").onclick = () => {
-        cur = 0;
-        setPlay(true);
-      };
-      $("astop").onclick = () => setPlay(false);
+      pcRow("a");
       $("aup").onchange = async (e) => {
         const files = [...e.target.files];
         if (!files.length) return;
@@ -9290,9 +9292,7 @@
           fxDrag = false;
         }),
       );
-      $("fxprev").onclick = () => nav(cur - 1);
-      $("fxnext").onclick = () => nav(cur + 1);
-      $("fxplay").onclick = () => setPlay(!playing);
+      pcRow("fx");
       fxLayers();
       fxUi();
       /* ===== Edit text ===== */
