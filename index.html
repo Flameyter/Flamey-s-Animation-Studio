@@ -2642,21 +2642,12 @@
           });
         x.drawImage(cur, -w / 2, -h / 2, w, h);
       }
-      let maFi = 0; /* the frame being drawn (for slideshow assets) */
       function drawFrame(x, f, al) {
         x.globalAlpha = al;
         if (f.layer) x.drawImage(f.layer, 0, 0);
-        maFi = 0;
-        for (const L of LAY) {
-          const j = L.k ? L.k.indexOf(f) : -1;
-          if (j >= 0) {
-            maFi = j;
-            break;
-          }
-        }
         f.items.forEach((it) => {
           const a = assets[it.a];
-          if (!a || it.bkh) return;
+          if (!a) return;
           const w = iw(it, a),
             h = ih(it, a);
           x.save();
@@ -4120,98 +4111,7 @@
          purpose. ===== */
       /* the dropdown of characters (every character rig in Rigs / the editor) */
       const bkCharList = () => RIGS.map((r) => [String(r.id), r.name || "character"]);
-      /* a character's ID: the one blocks gave it, or its hidden number if it never got one */
-      const bkCid = (r) => (r.cid != null && r.cid !== "" ? String(r.cid) : String(r.id));
-      const bkRigByCid = (id) => {
-        const k = String(id == null ? "" : id).trim();
-        return k === "" ? null : RIGS.find((r) => bkCid(r) === k) || null;
-      };
-      /* by ID first, then by name (capitals ignored) */
-      const bkRigFind = (x) => {
-        const k = String(x == null ? "" : x).trim().toLowerCase();
-        return bkRigByCid(x) || (k && RIGS.find((r) => String(r.name || "").toLowerCase() === k)) || null;
-      };
-      const bkRigParts = () => [["bones", "bones"], ["pieces", "pieces"], ["everything", "everything"]];
-      /* hides parts in the video without touching the per-bone “Invisible bone” boxes in Rigs */
-      function bkRigHide(r, what, on) {
-        const h = { ...(r.bkInv || {}) };
-        (what === "everything" ? ["bones", "pieces"] : [what === "pieces" ? "pieces" : "bones"]).forEach((k) => (on ? (h[k] = true) : delete h[k]));
-        r.bkInv = h;
-        dirty = true;
-      }
-      function bkRigChanged() {
-        dirty = true;
-        try {
-          rgSync();
-        } catch (e) {}
-      }
       const bkAssetList = () => assets.map((a, i) => [String(i), a.n || "asset " + (i + 1)]);
-      const BK_AMODES = ["slideshow", "static", "self-moveable", "moveable", "effect-able"];
-      const bkAssetByCid = (id) => {
-        const k = String(id == null ? "" : id).trim();
-        return k === "" ? null : assets.find((a) => a.cid != null && String(a.cid) === k) || null;
-      };
-      /* from a menu (its number in the list), or typed: an ID, then a name */
-      function bkAssetGet(x) {
-        const k = String(x == null ? "" : x).trim();
-        if (k === "") return null;
-        if (/^\d+$/.test(k) && assets[+k]) return assets[+k];
-        return bkAssetByCid(k) || assets.find((a) => String(a.n || "").toLowerCase() === k.toLowerCase()) || null;
-      }
-      function bkAssetsChanged() {
-        dirty = true;
-        try {
-          lib();
-        } catch (e) {}
-      }
-      /* join: the asset's own picture with every joined asset laid on top, all centered */
-      function bkAssetCompose(A) {
-        const J = A._jo;
-        if (!J.parts.length) {
-          A.cv = J.cv;
-          A.w = J.w;
-          A.h = J.h;
-          A.svg = J.svg;
-          A.looks = J.looks;
-          delete A._jo;
-        } else {
-          const W = Math.max(J.w, ...J.parts.map((b) => b.w)),
-            H = Math.max(J.h, ...J.parts.map((b) => b.h)),
-            k = Math.min(4, Math.max(0.25, J.cv.width / Math.max(1, J.w))),
-            one = (base) => {
-              const c = mk2(Math.max(1, Math.round(W * k)), Math.max(1, Math.round(H * k))),
-                x = c.getContext("2d");
-              x.imageSmoothingQuality = "high";
-              [[base, J.w, J.h]].concat(J.parts.map((b) => [b.cv, b.w, b.h])).forEach(([cv, w, h]) => x.drawImage(cv, ((W - w) / 2) * k, ((H - h) / 2) * k, w * k, h * k));
-              return c;
-            };
-          A.looks = J.looks && J.looks.length > 1 ? J.looks.map(one) : undefined;
-          A.cv = A.looks ? A.looks[0] : one(J.cv);
-          A.w = W;
-          A.h = H;
-          A.svg = undefined;
-        }
-        A.u = undefined;
-        A._v = undefined;
-        bkAssetsChanged();
-      }
-      /* show / hide: only on the frame being played (or the one open in the editor), not the whole video */
-      function bkAssetShow(x, on) {
-        const A = bkAssetGet(x);
-        if (!A) throw new Error("pick an asset");
-        const i = assets.indexOf(A),
-          n = (bkExp ? bkExpN : cur + 1) - 1;
-        LAY.forEach((L) => {
-          const f = L.k && L.k[n];
-          (f && f.items ? f.items : []).forEach((it) => {
-            if (it.a !== i) return;
-            if (on) delete it.bkh;
-            else it.bkh = true;
-          });
-        });
-        dirty = true;
-        return "";
-      }
       /* “in editor”: scripts that run whenever the project is open */
       let bkEdGen = 0,
         bkSilent = 0;
@@ -4650,7 +4550,6 @@
         commands: { n: "Commands", c: EVC, i: "📣" },
         function: { n: "Function", c: "#2bb0a6", i: "ƒ" },
         rigs: { n: "Rigs", c: "#ff5a2a", i: "🦴" },
-        massets: { n: "Make assets", c: "#ffab19", i: "✚" },
         looks: { n: "Looks", c: "#9966ff", i: "👁" },
         edit: { n: "Edit video", c: "#4c97ff", i: "✎" },
         variables: { n: "Variables", c: "#ff8c1a", i: "📦" },
@@ -4716,135 +4615,6 @@
            A character that is not on that frame also reports 0. */
         xofchar: { cat: "rigs", shape: "rep", tpl: "x of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "x") },
         yofchar: { cat: "rigs", shape: "rep", tpl: "y of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "y") },
-        /* ----- characters made and changed from Blocks -----
-           Every character has a character ID (r.cid) you can see and set from blocks. It is separate from the hidden
-           r.id the frames use, so changing it never unhooks a character from the video. Characters made with
-           “create a …” are “blocked characters” (r.bk). Ragdoll permission is only stored for now (r.ragdoll). */
-        rgcreate: { cat: "rigs", shape: "cmd", tpl: "create a %1 named: %2 id: %3 with ragdoll permissions set to %4", a: [["menu", "preset", [["preset", "preset"], ["blank", "blank"]]], ["str", ""], ["str", ""], ["menu", "true", [["true", "true"], ["false", "false"]]]], run: (v) => {
-          const name = String(v[1] == null ? "" : v[1]).trim() || "Character " + (RIGS.length + 1),
-            id = String(v[2] == null ? "" : v[2]).trim() || name;
-          if (bkRigByCid(id)) return ""; /* already made (a frame hat runs this every frame): do nothing */
-          const r = v[0] === "blank" ? newBlankRig(name) : newRig(name);
-          r.cid = id;
-          r.bk = true;
-          r.ragdoll = String(v[3]) !== "false";
-          RIGS.push(r);
-          bkRigChanged();
-          return "";
-        } },
-        rgrename: { cat: "rigs", shape: "cmd", tpl: "rename rigged character, %1 , to %2 and give id %3", a: [["str", ""], ["str", ""], ["str", ""]], run: (v) => {
-          const r = bkRigFind(v[0]);
-          if (!r) throw new Error("no character called “" + v[0] + "”");
-          const nn = String(v[1] == null ? "" : v[1]).trim(),
-            ni = String(v[2] == null ? "" : v[2]).trim();
-          if (ni && ni !== bkCid(r) && bkRigByCid(ni)) throw new Error("the ID “" + ni + "” is already taken");
-          if (nn) r.name = nn;
-          if (ni) r.cid = ni;
-          bkRigChanged();
-          return "";
-        } },
-        rgnamepre: { cat: "rigs", shape: "cmd", tpl: "name all presets %1 with id randomized and attached to set name", a: [["str", "man"]], run: (v) => {
-          const name = String(v[0] == null ? "" : v[0]).trim() || "man";
-          RIGS.filter((r) => !r.blank).forEach((r) => {
-            if (r.name === name && String(r.cid || "").startsWith(name + "-")) return; /* already done: keep its ID */
-            r.name = name;
-            let id;
-            do id = name + "-" + Math.floor(1000 + Math.random() * 9000);
-            while (bkRigByCid(id));
-            r.cid = id;
-          });
-          bkRigChanged();
-          return "";
-        } },
-        rghideall: { cat: "rigs", shape: "cmd", tpl: "make all %1 %2 in the video", a: [["menu", "bones", bkRigParts], ["menu", "invisible", [["invisible", "invisible"], ["visible", "visible"]]]], run: (v) => {
-          RIGS.forEach((r) => bkRigHide(r, v[0], v[1] !== "visible"));
-          return "";
-        } },
-        rghideone: { cat: "rigs", shape: "cmd", tpl: "make only %1 's %2 invisible in the video", a: [["menu", "", bkCharList], ["menu", "bones", bkRigParts]], run: (v) => {
-          const r = RIGS.find((q) => String(q.id) === String(v[0])) || bkRigFind(v[0]);
-          if (!r) throw new Error("pick a character");
-          bkRigHide(r, v[1], true);
-          return "";
-        } },
-        rglist: { cat: "rigs", shape: "list", tpl: "rigged characters", a: [], run: () => RIGS.map((r) => r.name || "Character") },
-        rgblist: { cat: "rigs", shape: "list", tpl: "blocked characters", a: [], run: () => RIGS.filter((r) => r.bk).map((r) => r.name || "Character") },
-        rgids: { cat: "rigs", shape: "rep", tpl: "character IDs", a: [], run: () => RIGS.map(bkCid).join(", ") },
-        rgragdoll: { cat: "rigs", shape: "cmd", tpl: "for ID Character %1 , set ragdoll permissions to %2", a: [["str", ""], ["menu", "true", [["true", "true"], ["false", "false"]]]], run: (v) => {
-          const r = bkRigByCid(v[0]);
-          if (!r) throw new Error("no character with the ID “" + v[0] + "”");
-          r.ragdoll = String(v[1]) !== "false";
-          dirty = true;
-          return "";
-        } },
-        rgidhas: { cat: "rigs", shape: "bool", tpl: "character ID %1 exists?", a: [["str", ""]], run: (v) => !!bkRigByCid(v[0]) },
-        /* ----- Make assets blocks -----
-           a.bk: made by a block; a.ma: saved in Make assets; a.kind: hitbox / floor / object; a.cid: its ID;
-           a.modes: list of modes (only slideshow does something so far); a.physics: stored for later;
-           a._jo: the asset's own picture before anything was joined onto it, and the assets joined on. */
-        mamake: { cat: "massets", shape: "cmd", tpl: "make an asset as %1 id %2 name %3", a: [["menu", "hitbox", [["hitbox", "hitbox"], ["floor", "floor"], ["object", "object"]]], ["str", ""], ["str", ""]], run: (v) => {
-          const kind = ["hitbox", "floor", "object"].includes(v[0]) ? v[0] : "object",
-            name = String(v[2] == null ? "" : v[2]).trim() || kind + " " + (assets.length + 1),
-            id = String(v[1] == null ? "" : v[1]).trim() || name;
-          if (bkAssetByCid(id)) return ""; /* already made (a frame hat runs this every frame) */
-          const [w, h, fill, line] = { hitbox: [120, 120, "rgba(255,60,60,.25)", "#ff3c3c"], floor: [480, 40, "#8a8f99", "#4d525c"], object: [100, 100, "#4c97ff", "#2a5fb0"] }[kind],
-            cv = mk2(w * 2, h * 2),
-            x = cv.getContext("2d");
-          x.fillStyle = fill;
-          x.fillRect(4, 4, cv.width - 8, cv.height - 8);
-          x.lineWidth = 6;
-          x.strokeStyle = line;
-          if (kind === "hitbox") x.setLineDash([16, 10]);
-          x.strokeRect(4, 4, cv.width - 8, cv.height - 8);
-          assets.push({ n: name, cv, w, h, bk: true, kind, cid: id, modes: [] });
-          bkAssetsChanged();
-          return "";
-        } },
-        majoin: { cat: "massets", shape: "cmd", tpl: "join asset %1 with %2", a: [["menu", "", bkAssetList], ["menu", "", bkAssetList]], run: (v) => {
-          const A = bkAssetGet(v[0]), B = bkAssetGet(v[1]);
-          if (!A || !B) throw new Error("pick two assets");
-          if (A === B) throw new Error("an asset can’t join itself");
-          if (!A._jo) A._jo = { cv: A.cv, w: A.w, h: A.h, svg: A.svg, looks: A.looks, parts: [] };
-          if (A._jo.parts.includes(B)) return "";
-          A._jo.parts.push(B);
-          bkAssetCompose(A);
-          return "";
-        } },
-        maall: { cat: "massets", shape: "list", tpl: "all assets", a: [], run: () => assets.map((a) => a.n) },
-        maasseted: { cat: "massets", shape: "list", tpl: "asseted assets", a: [], run: () => assets.filter((a) => a.ma).map((a) => a.n) },
-        mablocked: { cat: "massets", shape: "list", tpl: "blocked assets", a: [], run: () => assets.filter((a) => a.bk).map((a) => a.n) },
-        mashow: { cat: "massets", shape: "cmd", tpl: "show asset %1", a: [["menu", "", bkAssetList]], run: (v) => bkAssetShow(v[0], true) },
-        mahide: { cat: "massets", shape: "cmd", tpl: "hide asset %1", a: [["menu", "", bkAssetList]], run: (v) => bkAssetShow(v[0], false) },
-        maphys: { cat: "massets", shape: "cmd", tpl: "allow physics for asset %1", a: [["menu", "", bkAssetList]], run: (v) => {
-          const A = bkAssetGet(v[0]);
-          if (!A) throw new Error("pick an asset");
-          A.physics = true;
-          dirty = true;
-          return "";
-        } },
-        /* the second menu picks the asset; "all assets" (and scripts saved before it had a menu) change every asset */
-        mamode: { cat: "massets", shape: "cmd", tpl: "set asset mode to %1 for %2", a: [["menu", "slideshow", BK_AMODES.concat(["none", "all"]).map((m) => [m, m])], ["menu", "*", () => [["*", "all assets"]].concat(bkAssetList())]], run: (v) => {
-          const m = String(v[0]),
-            all = v[1] == null || v[1] === "" || v[1] === "*",
-            A = all ? null : bkAssetGet(v[1]);
-          if (!all && !A) throw new Error("pick an asset");
-          (all ? assets : [A]).forEach((a) => {
-            const now = new Set(a.modes || []);
-            if (m === "none") now.clear();
-            else if (m === "all") BK_AMODES.forEach((k) => now.add(k));
-            else if (BK_AMODES.includes(m)) now.add(m);
-            a.modes = [...now];
-          });
-          dirty = true;
-          return "";
-        } },
-        mabreak: { cat: "massets", shape: "cmd", tpl: "break asset %1 from %2", a: [["menu", "", bkAssetList], ["menu", "", bkAssetList]], run: (v) => {
-          const A = bkAssetGet(v[0]), B = bkAssetGet(v[1]);
-          if (!A || !B) throw new Error("pick two assets");
-          if (!A._jo || !A._jo.parts.includes(B)) return ""; /* not joined: nothing to break */
-          A._jo.parts = A._jo.parts.filter((q) => q !== B);
-          bkAssetCompose(A);
-          return "";
-        } },
         /* text: holds whatever you type in its box, as text (so 5 stays the word "5", not a number) */
         text: { cat: "operators", shape: "rep", tpl: "text %1", a: [["str", ""]], run: (v) => (v[0] == null ? "" : String(v[0])) },
         /* the hexagon: a true/false block with a box. If the box holds a number anywhere in it (the first one counts), only that number matters:
@@ -7742,7 +7512,7 @@
           bh = t.cv.height,
           s = Math.min(0.5, 520 / Math.max(bw, bh)),
           nm = $("ename").value.trim() || "Asset " + cn++;
-        assets.push({ n: nm, cv: t.cv, w: bw * s, h: bh * s, looks: crops.length > 1 ? crops : undefined, ma: true });
+        assets.push({ n: nm, cv: t.cv, w: bw * s, h: bh * s, looks: crops.length > 1 ? crops : undefined });
         F().items.push({ a: assets.length - 1, x: 320, y: 180, sc: 1, r: 0 });
         addBp(nm, t.cv);
         lib();
@@ -12695,7 +12465,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         const hide = rig.hide || {},
           part = (e) => {
             const g = G[e.id];
-            if (!g || e.invisible || (rig.bkInv && rig.bkInv[e.art ? "pieces" : "bones"])) return;
+            if (!g || e.invisible) return;
             const im = e.looks && e.looks.length > 1 ? e.looks[((pose.l && pose.l[e.id]) || 0) % e.looks.length] : e.img;
             if (e.shape === "image" && im && im.cv) {
               x.save();
@@ -12730,7 +12500,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           },
           extras = (front) => (rig.extra || []).filter((e) => !!e.front === front).forEach(part),
           vis = (k, fn) => {
-            if (!hide[k] && !(rig.bkInv && rig.bkInv.bones)) fn();
+            if (!hide[k]) fn();
           };
         extras(false);
         if (side) {
@@ -12760,7 +12530,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         return c;
       }
       const rgImgId = (o) => (o ? o.id || (o.id = Math.random().toString(36).slice(2, 8)) : 0);
-      const rgKey = (rig, pose, flip) => JSON.stringify([rig.id, rig.look, rig.view, flip == null ? rig.flip : flip, rig.size, rig.blank, rgImgId(rig.head), (rig.extra || []).map((e) => ({ ...e, img: rgImgId(e.img), looks: e.looks ? e.looks.map(rgImgId) : 0 })), rig.hide, rig.bkInv || 0, pose]);
+      const rgKey = (rig, pose, flip) => JSON.stringify([rig.id, rig.look, rig.view, flip == null ? rig.flip : flip, rig.size, rig.blank, rgImgId(rig.head), (rig.extra || []).map((e) => ({ ...e, img: rgImgId(e.img), looks: e.looks ? e.looks.map(rgImgId) : 0 })), rig.hide, pose]);
       function rgAsset(rig, pose, label) {
         const key = rgKey(rig, pose),
           hit = rgCache.get(key);
@@ -13164,7 +12934,6 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           c = rgCopy({ ...r0, head: null, extra: (r0.extra || []).map((e) => ({ ...e, img: null })) });
         c.extra.forEach((e, i) => (e.img = r0.extra[i].img));
         c.id = Date.now();
-        delete c.cid; /* a copy gets its own ID (its hidden number) */
         c.name = rg().name + " copy";
         c.head = rg().head ? { u: rg().head.u, cv: rg().head.cv } : null;
         RIGS.push(c);
@@ -13300,40 +13069,6 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         dirty = true;
         rgm("Put this pose on frame " + (cur + 1) + ". You can still move, size and turn it in Edit video.");
       };
-      /* keep what the Make assets blocks set on each asset inside saved projects */
-      const _projMA = proj;
-      proj = function () {
-        const p = _projMA();
-        p.bkas = assets.map((a) => {
-          const o = {};
-          ["bk", "ma", "kind", "cid", "physics"].forEach((k) => a[k] != null && (o[k] = a[k]));
-          if (a.modes && a.modes.length) o.modes = a.modes;
-          if (a._jo) {
-            const J = a._jo;
-            o.jo = { u: J.cv._u || (J.cv._u = J.cv.toDataURL()), w: J.w, h: J.h, svg: J.svg, looks: J.looks ? J.looks.map((c) => c._u || (c._u = c.toDataURL())) : undefined, parts: J.parts.map((b) => assets.indexOf(b)).filter((i) => i >= 0) };
-          }
-          return o;
-        });
-        return p;
-      };
-      const _loadMA = load;
-      load = async function (p) {
-        const bs = Array.isArray(p.bkas) ? p.bkas : [];
-        await _loadMA(p);
-        for (let i = 0; i < assets.length; i++) {
-          const o = bs[i];
-          if (!o) continue;
-          const a = assets[i];
-          ["bk", "ma", "kind", "cid", "physics"].forEach((k) => o[k] != null && (a[k] = o[k]));
-          if (Array.isArray(o.modes)) a.modes = o.modes.filter((m) => BK_AMODES.includes(m));
-          if (o.jo && o.jo.u) {
-            const looks = [];
-            for (const u of o.jo.looks || []) looks.push(await img2cv(u));
-            a._jo = { cv: await img2cv(o.jo.u), w: o.jo.w, h: o.jo.h, svg: o.jo.svg, looks: looks.length ? looks : undefined, parts: (o.jo.parts || []).map((j) => assets[j]).filter(Boolean) };
-          }
-        }
-      };
-
       /* keep the rigs inside saved projects */
       const _projR = proj;
       proj = function () {
@@ -13369,7 +13104,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         }
         const list = [], gone = new Set();
         for (const r of p.rigs || []) {
-          if (!r.blank && !r.bk) {
+          if (!r.blank) {
             gone.add(r.id); /* the old preset man: not kept any more */
             continue;
           }
@@ -14788,7 +14523,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         return a._vp;
       }
       function vecFor(a, w, h, x) {
-        if (!a || !a.svg || (a.looks && a.looks.length > 1 && a.modes && a.modes.includes("slideshow") && !a.modes.includes("static"))) return null;
+        if (!a || !a.svg) return null;
         let m = 1;
         try {
           const t = x.getTransform();
@@ -14836,7 +14571,6 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           const rig = RIGS.find((r) => r.id === it.rig);
           if (rig) return rgLive(rig, it);
         }
-        if (a.looks && a.looks.length > 1 && a.modes && a.modes.includes("slideshow") && !a.modes.includes("static")) return a.looks[((it.look || 0) + maFi) % a.looks.length];
         return a.looks && a.looks.length > 1 ? a.looks[(it.look || 0) % a.looks.length] : a.cv;
       }
       const poseSame = (p, q) => JSON.stringify([p.pose || 0, p.flip || 0]) === JSON.stringify([q.pose || 0, q.flip || 0]);
