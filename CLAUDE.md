@@ -28,7 +28,8 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - `infinity of`: repeat M = N+1, L = M^M until L carries E (stop at 1e21); if it goes infinite, the previous step is the answer.
 - `() of ()` is the mod block. `() uses ()` has the text first, the part second. The grey keep blocks and the yellow command blocks live in their own categories; the `when <>` hat is the only block in Function. The C-shaped `when <>` is an if block and stays in Control.
 - `() out ()` and `() in ()` were dropped on purpose.
-- Audio blocks (`talk with audio` = play once, `add sound … as a background` = loop under the whole video, `play sound … about () times` = whole sound back to back N times, `all sounds`) must be in the exported video, because videos go to YouTube. A block never restarts its sound while it is still going (`BK_SND`); while exporting, sounds go into the recording through `bkSndOut`. `if bounce, play sound` waits until physics and ragdoll are done.
+- Audio blocks (`talk with audio` = play once, `add sound … as a background` = loop under the whole video, `play sound … about () times` = whole sound back to back N times, `all sounds`) must be in the exported video, because videos go to YouTube. A block never restarts its sound while it is still going (`BK_SND`); while exporting, sounds go into the recording through `bkSndOut`.
+- No physics or ragdoll blocks (Joel does that himself): the old `make () able to handle physics` block and the planned `if bounce, play sound` were dropped.
 - The Zipper no longer loads frames (it was slow); the Upgrades "frames eaten" counter no longer counts for new zips.
 
 ## Defaults I guessed that Joel never answered

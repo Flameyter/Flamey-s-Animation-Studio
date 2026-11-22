@@ -4667,8 +4667,6 @@
         stickerasset: { cat: "looks", shape: "cmd", tpl: "sticker %1 at x: %2 y: %3", a: [["menu", "", bkAssetList], ["num", ""], ["num", ""]], run: (v, b) => bkPlaceAsset(v, b, true) },
         /* set tweening for frame () to [true / false]: turns the Tween button of that frame on or off (the blue T), so the assets and text glide from it to the next frame where they move.
            Turning it on also fills the frames in between, just like pressing the button. A frame number that does not exist does nothing. */
-        /* make (asset) able to handle physics: kept for later. It does nothing yet on purpose (it only shows in the log). */
-        physics: { cat: "looks", shape: "cmd", tpl: "make %1 able to handle physics", a: [["menu", "", bkAssetList]], run: () => "" },
         /* look glitch (asset) style: (RGB / Slices / Static / All): makes that asset look glitchy on the frame this runs in (like display, it needs a frame hat above it).
            RGB splits the colors, Slices shifts strips sideways, Static scatters noise, All mixes the three. It keeps flickering while it plays. Undo brings the asset back to normal. */
         lookglitch: { cat: "looks", shape: "cmd", tpl: "look glitch %1 style: %2", a: [["menu", "", bkAssetList], ["menu", "RGB", [["RGB", "RGB"], ["Slices", "Slices"], ["Static", "Static"], ["All", "All"]]]], run: (v, b) => {
