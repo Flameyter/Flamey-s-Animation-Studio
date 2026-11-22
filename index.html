@@ -578,6 +578,21 @@
       .bkloop { position: absolute; right: 12px; top: 2px; color: #fff; font-size: 15px; line-height: 20px; }
       .bkslot.bool.empty { width: 46px; height: 24px; background: rgba(0, 0, 0, 0.25); clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%); border-radius: 0; }
       .bkblk.s-bool { height: 34px; padding: 0 14px; }
+      /* Audio timeline */
+      #atl { position: relative; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; border-radius: 8px; background: rgba(0, 0, 0, 0.25); }
+      #atl .atin { position: relative; min-width: 100%; }
+      #atl .atru { position: relative; height: 24px; cursor: pointer; border-bottom: 1px solid var(--ln); touch-action: none; }
+      #atl .atru span { position: absolute; top: 4px; font: 600 10px/1 system-ui, sans-serif; color: #9aa0aa; transform: translateX(-50%); pointer-events: none; white-space: nowrap; }
+      #atl .atru i { position: absolute; bottom: 0; width: 1px; height: 6px; background: #6b707a; pointer-events: none; }
+      #atl .atrow { position: relative; height: 40px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+      #atl .atbar { position: absolute; top: 5px; height: 30px; border-radius: 6px; background: #855cd6; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25); cursor: grab; touch-action: none; overflow: hidden; }
+      #atl .atbar.sel { box-shadow: inset 0 0 0 2px #fff; }
+      #atl .atbar canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.55; }
+      #atl .atbar b { position: absolute; left: 6px; top: 7px; right: 14px; font: 700 11px/16px system-ui, sans-serif; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+      #atl .atbar u { position: absolute; right: 0; top: 0; bottom: 0; width: 12px; cursor: ew-resize; background: rgba(255, 255, 255, 0.3); }
+      #atl .atend { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255, 255, 255, 0.25); pointer-events: none; }
+      #atl .atph { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #ff6680; pointer-events: none; z-index: 2; }
+      #atl .atnone { padding: 14px; color: #9aa0aa; font: 13px system-ui, sans-serif; }
       .bkblk.s-rep, .bkblk.s-list { height: 34px; padding: 0 14px; }
       .bkblk.nested { height: 28px; padding: 0 10px; font-size: 12px; gap: 4px; }
       .bkblk.inpal input, .bkblk.inpal select { pointer-events: none; }
@@ -1382,6 +1397,11 @@
         <canvas id="ac" width="640" height="360"></canvas>
         <div class="row">
           <button id="aplay" class="g">▶ Play from start</button><button id="astop" class="r">■</button>
+        </div>
+        <div class="pn atlp">
+          <div class="ph">Timeline</div>
+          <div class="lbl">Drag a track to move where it starts. Drag its right edge to make it end sooner. Tap the frame numbers to jump there.</div>
+          <div id="atl"></div>
         </div>
         <div class="pn">
           <div class="ph">Add audio</div>
@@ -8413,22 +8433,164 @@
           st.oninput = () => {
             a.start = Math.max(0, Math.round(((parseFloat(st.value) || 1) - 1) * 100) / 100);
             if (a.end != null && a.end < a.start) a.end = a.start;
+            dirty = true;
+            atlDraw();
           };
           en.oninput = () => {
             const v = parseFloat(en.value);
             a.end = v > 0 ? Math.max(a.start, Math.round((v - 1) * 100) / 100) : null;
+            dirty = true;
+            atlDraw();
           };
           vo.oninput = () => {
             a.vol = vo.value / 100;
+            dirty = true;
           };
           d.querySelector(".pl").onclick = () => previewTrack(a);
           d.querySelector(".rm").onclick = () => {
             AUD.splice(i, 1);
+            dirty = true;
             audUi();
           };
+          d.dataset.ai = i;
           el.appendChild(d);
         });
+        atlDraw();
       }
+      /* ===== Audio timeline: one row per track under the video. x is frames; a bar runs from where the track starts
+         to where it ends (its own length, or "Ends at frame"). Drag a bar to move its start, drag its right edge to
+         set its end (drag it back past the whole clip to play all of it again). Tap the numbers to jump to a frame. ===== */
+      let atlSel = -1,
+        atlSig = "",
+        atlDrag = false; /* while a bar is being dragged, don't draw the timeline again under the finger */
+      const atlFps = () => +$("fps").value || 8;
+      const atlLen = (a) => (a.end == null ? a.buf.duration * atlFps() : a.end + 1 - a.start); /* in frames */
+      function atlPeaks(a, w, h) {
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.min(2000, Math.round(w)));
+        c.height = h;
+        const x = c.getContext("2d"),
+          d = a.buf.getChannelData(0),
+          shown = Math.min(1, atlLen(a) / (a.buf.duration * atlFps())),
+          per = Math.max(1, Math.floor((d.length * shown) / c.width));
+        x.fillStyle = "#fff";
+        for (let i = 0; i < c.width; i++) {
+          let m = 0;
+          for (let j = i * per, e = Math.min(d.length, j + per); j < e; j += 4) m = Math.max(m, Math.abs(d[j]));
+          const y = Math.max(1, m * h * 0.9);
+          x.fillRect(i, (h - y) / 2, 1, y);
+        }
+        return c;
+      }
+      function atlDraw() {
+        const box = $("atl");
+        if (!box) return;
+        atlSig = atlKey();
+        box.innerHTML = "";
+        const fps = atlFps(),
+          total = Math.max(frames.length, ...AUD.map((a) => Math.ceil(a.start + atlLen(a)))) + 2,
+          W = Math.max(box.clientWidth || 300, total * 14),
+          px = W / total, /* pixels per frame */
+          inner = document.createElement("div");
+        inner.className = "atin";
+        inner.style.width = W + "px";
+        /* frame numbers */
+        const ru = document.createElement("div");
+        ru.className = "atru";
+        const step = [1, 2, 5, 10, 20, 50, 100, 200, 500].find((k) => k * px >= 34) || 1000;
+        for (let f = 0; f < total; f += step) {
+          const t = document.createElement("span");
+          t.style.left = f * px + 2 + "px";
+          t.textContent = f + 1;
+          const k = document.createElement("i");
+          k.style.left = f * px + "px";
+          ru.append(t, k);
+        }
+        ru.onpointerdown = (e) => {
+          const r = ru.getBoundingClientRect(),
+            f = Math.max(0, Math.min(frames.length - 1, Math.floor((e.clientX - r.left) / px)));
+          cur = f;
+          if (playing) setPlay(true); /* keep playing from the new frame, with the sound in the right place */
+          else ui();
+        };
+        inner.appendChild(ru);
+        /* where the video ends */
+        const ve = document.createElement("div");
+        ve.className = "atend";
+        ve.style.left = frames.length * px + "px";
+        inner.appendChild(ve);
+        if (!AUD.length) {
+          const n = document.createElement("div");
+          n.className = "atnone";
+          n.textContent = "No audio yet. Record your voice or upload a file below, and it shows up here.";
+          inner.appendChild(n);
+        }
+        AUD.forEach((a, i) => {
+          const row = document.createElement("div");
+          row.className = "atrow";
+          const bar = document.createElement("div");
+          bar.className = "atbar" + (i === atlSel ? " sel" : "");
+          const place = () => {
+            bar.style.left = a.start * px + "px";
+            bar.style.width = Math.max(14, atlLen(a) * px) + "px";
+          };
+          place();
+          bar.appendChild(atlPeaks(a, Math.max(14, atlLen(a) * px), 30));
+          const nm = document.createElement("b");
+          nm.textContent = a.n;
+          const hd = document.createElement("u");
+          bar.append(nm, hd);
+          bar.onpointerdown = (e) => {
+            e.preventDefault();
+            atlSel = i;
+            inner.querySelectorAll(".atbar").forEach((q) => q.classList.toggle("sel", q === bar));
+            const edge = e.target === hd,
+              x0 = e.clientX,
+              s0 = a.start,
+              l0 = atlLen(a),
+              whole = a.buf.duration * fps;
+            bar.setPointerCapture(e.pointerId);
+            atlDrag = true;
+            bar.style.cursor = "grabbing";
+            bar.onpointermove = (m) => {
+              const df = Math.round((m.clientX - x0) / px);
+              if (edge) {
+                const len = Math.max(1, l0 + df);
+                a.end = len >= whole ? null : a.start + len - 1; /* past its own length: play all of it */
+              } else a.start = Math.max(0, s0 + df);
+              place();
+            };
+            bar.onpointerup = bar.onpointercancel = () => {
+              bar.onpointermove = bar.onpointerup = bar.onpointercancel = null;
+              atlDrag = false;
+              bar.style.cursor = "";
+              if (a.start !== s0 || atlLen(a) !== l0) dirty = true;
+              audUi(); /* the boxes below show the new numbers */
+              const card = document.querySelector('#alist [data-ai="' + i + '"]');
+              if (card) card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            };
+          };
+          row.appendChild(bar);
+          inner.appendChild(row);
+        });
+        /* the red line is the frame being shown */
+        const ph = document.createElement("div");
+        ph.className = "atph";
+        inner.appendChild(ph);
+        box.__ph = () => (ph.style.left = (cur + 0.5) * px + "px");
+        box.__ph();
+        box.appendChild(inner);
+      }
+      /* when the frames, the frames per second or a track change somewhere else, draw it again; move the red line as it plays */
+      const atlKey = () => [frames.length, atlFps(), ($("atl") || {}).clientWidth, AUD.map((a) => [a.n, a.start, a.end, a.buf && a.buf.duration])].join("|");
+      (function atlTick() {
+        requestAnimationFrame(atlTick);
+        if (view !== "audio") return;
+        const box = $("atl");
+        if (!box) return;
+        if (!atlDrag && atlKey() !== atlSig) atlDraw();
+        else if (box.__ph) box.__ph();
+      })();
       $("aplay").onclick = () => {
         cur = 0;
         setPlay(true);
