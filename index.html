@@ -11403,8 +11403,14 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           }),
       );
       $("setsz").onclick = () => {
-        const w = Math.max(64, Math.min(1920, Math.round(+$("sw").value) || CW)),
-          h = Math.max(64, Math.min(1920, Math.round(+$("sh").value) || CH));
+        /* a size has to be a number from 64 to 1920; anything else is not changed quietly, it is explained */
+        const ok = (v) => /^\s*\d+(\.\d+)?\s*$/.test(v) && +v >= 64 && +v <= 1920;
+        if (!ok($("sw").value) || !ok($("sh").value)) {
+          $("setmsg").textContent = "Width and height have to be numbers from 64 to 1920. Nothing was changed.";
+          return;
+        }
+        const w = Math.round(+$("sw").value),
+          h = Math.round(+$("sh").value);
         $("sw").value = w;
         $("sh").value = h;
         const sc2 = $("setscale").checked;
