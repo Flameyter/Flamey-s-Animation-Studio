@@ -1899,7 +1899,7 @@
           <div class="tools" id="vopre" style="flex-wrap: wrap"></div>
           <label class="sl">Strength<input type="range" id="vok" min="0" max="100" value="60" /></label>
           <div class="row"><button id="vopv">▶ Preview</button><button id="voapply" class="g">Apply to track</button><button id="vonew">Apply as new track</button><button id="vorev">Revert</button>
-          <label class="sl" style="flex: 1 1 100%"><input type="checkbox" id="voexp" checked style="width: auto" /> Export a .wav file when I tap Apply</label></div>
+          <label class="sl" style="flex: 1 1 100%"><input type="checkbox" id="voexp" style="width: auto" /> Export a .wav file when I tap Apply</label></div>
           <div id="vomsg"></div>
         </div>
       </div>
@@ -11985,8 +11985,8 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
             say("vomsg", "Applied " + label + " to “" + a.n + "”. Revert puts the original back.");
           } else {
             AUD.push({ n: a.n + " (" + label.replace(/^\S+\s/, "") + ")", u: wavURL(nb), buf: nb, start: a.start, end: a.end == null ? null : a.end, vol: a.vol });
-            voIdx = AUD.length - 1;
-            say("vomsg", "Added as a new track.");
+            /* stay on the original sound, so the next style starts fresh instead of going on top of this one */
+            say("vomsg", "Added as a new track: “" + AUD[AUD.length - 1].n + "”. Pick another style to try it on the original.");
           }
           dirty = true;
           audUi();
