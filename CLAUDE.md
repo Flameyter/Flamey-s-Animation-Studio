@@ -21,6 +21,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - Fullscreen editor: anything appended to `document.body` is hidden while fullscreen. Append to `document.fullscreenElement || document.body`.
 
 ## Decisions Joel made (keep these)
+- Blocks are for creating things that are not assets or characters, and for enabling things. No blocks that make assets or characters (Joel makes those himself). The Rigs, Make assets, Edit text and Fonts blocks were removed for this reason; only the original `x of ()` and `y of ()` stay in Rigs. Converter and Zipper don't need blocks.
 - No "stop all" block; `stop` ends only its own script. Two `stop` blocks must not stack.
 - `<>` truth rule (`bkTruthy`): a number anywhere in the text decides (0 is false); otherwise words are true unless "false"; an empty box is false.
 - `infinity of`: repeat M = N+1, L = M^M until L carries E (stop at 1e21); if it goes infinite, the previous step is the answer.
