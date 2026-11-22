@@ -7613,6 +7613,7 @@
           SEL = [];
           EM = "bm";
           $("econv").textContent = "Convert to Vector";
+          $("emsg2").textContent = "Now a bitmap: the brush and eraser paint pixels. Convert to Vector turns it back into one picture you can move.";
         } else {
           if (BM) {
             const t = trimCv(BM);
@@ -7625,6 +7626,7 @@
           BM = null;
           EM = "vec";
           $("econv").textContent = "Convert to Bitmap";
+          $("emsg2").textContent = "Now a vector: everything is one picture you can move, size and turn. Shapes you draw next stay separate.";
         }
         push();
       };
