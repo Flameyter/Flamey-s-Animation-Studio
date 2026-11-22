@@ -4110,6 +4110,36 @@
          also change Upgrades (energy, prices, locks, Pro) and remove extensions, even Blocks itself. That is on
          purpose. ===== */
       /* the dropdown of characters (every character rig in Rigs / the editor) */
+      /* ----- sounds played by the Audio blocks ----- */
+      const bkSndList = () => AUD.map((a, i) => [String(i), a.n]);
+      let BK_SND = []; /* sounds blocks started: { key, end } (end in AudioContext seconds; Infinity for a background) */
+      let bkSndOut = null; /* while exporting: { A, dest, t0, fps, srcs } so block sounds go into the video */
+      function bkSndPlay(b, x, times, bg) {
+        const a = /^\d+$/.test(String(x)) ? AUD[+x] : null;
+        if (!a || !a.buf) throw new Error(AUD.length ? "pick a sound" : "add a sound on the Audio page first");
+        const out = bkExp ? bkSndOut : null, /* only while a video is being exported */
+          live = out || playing,
+          A = out ? out.A : actx(),
+          key = bg ? "bg:" + AUD.indexOf(a) : b;
+        if (live && BK_SND.some((q) => q.key === key && q.end > A.currentTime)) return ""; /* still going: don't restart it */
+        A.resume();
+        const fps = out ? out.fps : +$("fps").value || 8,
+          at = out ? Math.max(A.currentTime, out.t0 + ((bkExp ? bkExpN : cur + 1) - 1) / fps) : A.currentTime + 0.01,
+          dur = a.buf.duration;
+        for (let k = 0; k < (bg ? 1 : times); k++) {
+          const src = A.createBufferSource(),
+            g = A.createGain();
+          src.buffer = a.buf;
+          src.loop = !!bg; /* a background goes round and round until the video ends */
+          g.gain.value = a.vol;
+          src.connect(g);
+          g.connect(out ? out.dest : A.destination);
+          src.start(at + k * dur);
+          (out ? out.srcs : SRC).push(src);
+        }
+        if (live) BK_SND.push({ key, end: bg ? Infinity : at + times * dur });
+        return "";
+      }
       const bkCharList = () => RIGS.map((r) => [String(r.id), r.name || "character"]);
       const bkAssetList = () => assets.map((a, i) => [String(i), a.n || "asset " + (i + 1)]);
       /* “in editor”: scripts that run whenever the project is open */
@@ -4550,6 +4580,7 @@
         commands: { n: "Commands", c: EVC, i: "📣" },
         function: { n: "Function", c: "#2bb0a6", i: "ƒ" },
         rigs: { n: "Rigs", c: "#ff5a2a", i: "🦴" },
+        audio: { n: "Audio", c: "#855cd6", i: "🎙" },
         looks: { n: "Looks", c: "#9966ff", i: "👁" },
         edit: { n: "Edit video", c: "#4c97ff", i: "✎" },
         variables: { n: "Variables", c: "#ff8c1a", i: "📦" },
@@ -4615,6 +4646,13 @@
            A character that is not on that frame also reports 0. */
         xofchar: { cat: "rigs", shape: "rep", tpl: "x of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "x") },
         yofchar: { cat: "rigs", shape: "rep", tpl: "y of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "y") },
+        /* ----- Audio blocks: play tracks from the Audio page. While playing they are heard; while exporting they go
+           into the video at the frame the block runs. A block never restarts its sound while that sound is still
+           going (so a frame hat that runs every frame doesn't stutter it). Tapped in the editor, they play as a preview. */
+        autalk: { cat: "audio", shape: "cmd", tpl: "talk with audio %1", a: [["menu", "", bkSndList, "no given audio"]], run: (v, b) => bkSndPlay(b, v[0], 1, false) },
+        aubg: { cat: "audio", shape: "cmd", tpl: "add sound %1 as a background", a: [["menu", "", bkSndList, "no given background noise"]], run: (v, b) => bkSndPlay(b, v[0], 1, true) },
+        aurep: { cat: "audio", shape: "cmd", tpl: "play sound %1 about %2 times", a: [["menu", "", bkSndList, "no selected sound"], ["num", "2"]], run: (v, b) => bkSndPlay(b, v[0], Math.max(1, Math.min(100, Math.round(bkNum(v[1])) || 1)), false) },
+        auall: { cat: "audio", shape: "list", tpl: "all sounds", a: [], run: () => AUD.map((a) => a.n) },
         /* text: holds whatever you type in its box, as text (so 5 stays the word "5", not a number) */
         text: { cat: "operators", shape: "rep", tpl: "text %1", a: [["str", ""]], run: (v) => (v[0] == null ? "" : String(v[0])) },
         /* the hexagon: a true/false block with a box. If the box holds a number anywhere in it (the first one counts), only that number matters:
@@ -5581,7 +5619,7 @@
         let el;
         if (def[0] === "menu") {
           el = document.createElement("select");
-          const opts = typeof def[2] === "function" ? [["", "pick…"]].concat(def[2]()) : def[2];
+          const opts = typeof def[2] === "function" ? [["", def[3] || "pick…"]].concat(def[2]()) : def[2]; /* def[3]: what an empty menu says */
           opts.forEach(([k, l]) => {
             const o = document.createElement("option");
             o.value = k;
@@ -8246,6 +8284,7 @@
         return a.buffer;
       }
       function audioStop() {
+        BK_SND = [];
         SRC.forEach((s) => {
           try {
             s.stop();
@@ -8518,6 +8557,8 @@
           s.start(t0 + a.start / fps, 0, audLen(a, fps));
           srcs.push(s);
         });
+        BK_SND = [];
+        bkSndOut = { A, dest, t0, fps, srcs };
         for (let i = 0; i < frames.length; i++) {
           $("emsg").textContent =
             "Recording frame " + (i + 1) + " of " + frames.length + " (with sound). Keep this screen open.";
@@ -8527,6 +8568,8 @@
             await new Promise((s) => setTimeout(s, Math.max(0, (t0 + (i + (k + 1) / SUB) / fps - A.currentTime) * 1000)));
           }
         }
+        bkSndOut = null;
+        BK_SND = [];
         r.stop();
         srcs.forEach((s) => {
           try {

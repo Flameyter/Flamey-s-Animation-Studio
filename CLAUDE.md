@@ -12,7 +12,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 ## How blocks work
 - `BLK` defines each block: `{cat, shape, tpl, a, run, [col], [lazy], [loop]}`. `tpl` uses `%1 %2` for inputs. Shapes: `hat`, `cmd`, `cap`, `c` (one mouth), `c2` (two mouths, `because`), `c3` (three mouths, `trycatch`), `rep` (round), `bool` (pointed), `list` (square).
 - `a` entries are `[type, default, options]` with types `num`, `str`, `text`, `bool`, `menu`.
-- The tray order is the key order of `BLK` within each category. `BKCAT` holds the categories: watch, settings, operators, control, keep, commands, function, rigs, looks, edit, variables.
+- The tray order is the key order of `BLK` within each category. `BKCAT` holds the categories: watch, settings, operators, control, keep, commands, function, rigs, audio, looks, edit, variables.
 - `BKS` is the list of scripts `{x, y, b:[blocks]}`; a block is `{t, v:[values or {r: block}], s, s2, s3}`. Saved to localStorage `oss_blocks`. Variables in `oss_blkvars`.
 - Running: `bkEval` / `bkVals` / `bkRunList` / `bkRunStack`. Control flow is done with thrown sentinels: `BK_STOP`, `BK_BREAK`, `BK_CONT`, `BK_RESTART`, `BK_FAIL`, `BK_KILL`, and return objects `{bkRet:true, value}`. `bkRunList` rethrows these; loops use `bkLoopBody`.
 - Frame hats are `whenframe`, `whenfromto`, `whencond` (see `bkFrameHat`, `bkHit`); `ineditor` runs when a project opens. `bkPlayFrame` fires hats while playing and `bkExportFrame` while exporting (`bkExp` holds export state).
@@ -28,6 +28,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - `infinity of`: repeat M = N+1, L = M^M until L carries E (stop at 1e21); if it goes infinite, the previous step is the answer.
 - `() of ()` is the mod block. `() uses ()` has the text first, the part second. The grey keep blocks and the yellow command blocks live in their own categories; the `when <>` hat is the only block in Function. The C-shaped `when <>` is an if block and stays in Control.
 - `() out ()` and `() in ()` were dropped on purpose.
+- Audio blocks (`talk with audio` = play once, `add sound … as a background` = loop under the whole video, `play sound … about () times` = whole sound back to back N times, `all sounds`) must be in the exported video, because videos go to YouTube. A block never restarts its sound while it is still going (`BK_SND`); while exporting, sounds go into the recording through `bkSndOut`. `if bounce, play sound` waits until physics and ragdoll are done.
 - The Zipper no longer loads frames (it was slow); the Upgrades "frames eaten" counter no longer counts for new zips.
 
 ## Defaults I guessed that Joel never answered
