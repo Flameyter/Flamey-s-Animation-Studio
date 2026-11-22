@@ -8414,6 +8414,9 @@
         return {
           add(cv, ts, dur) {
             if (err) throw err;
+            /* every frame needs a length, or the MP4 maker throws it away (the Converter used to send none, so its
+               MP4s came out empty); without one, a frame lasts one frame at this frame rate */
+            if (!(dur > 0)) dur = Math.round(1e6 / (fps || 30));
             const f = new VideoFrame(cv, { timestamp: ts, duration: dur });
             enc.encode(f, { keyFrame: n++ % 30 === 0 });
             f.close();
