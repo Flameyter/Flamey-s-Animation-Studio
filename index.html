@@ -13385,7 +13385,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           ri = RIGS.length - 1;
           rgSync();
           dirty = true;
-          rgm("New blank character. Tap ＋ ADD PIECE to put your first piece on the stage.");
+          rgm("New blank character. Start with bones: tap ＋ LINE and drag, or ● DOT and tap.");
         } catch (e) {
           RIGS.pop();
           ri = Math.max(0, RIGS.length - 1);
@@ -13404,12 +13404,27 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         rgSync();
         dirty = true;
       };
+      /* Delete asks for a second tap first (like Clear the project), then picks the character next to it */
+      let rgDelArm = 0;
       $("rgdel").onclick = () => {
         if (RIGS.length < 2) return rgm("You need at least one character.");
+        if (!rgDelArm) {
+          rgDelArm = setTimeout(() => {
+            rgDelArm = 0;
+            $("rgdel").textContent = "Delete";
+          }, 4000);
+          $("rgdel").textContent = "Tap again to delete " + (rg().name || "this character");
+          return;
+        }
+        clearTimeout(rgDelArm);
+        rgDelArm = 0;
+        $("rgdel").textContent = "Delete";
+        const gone = rg().name;
         RIGS.splice(ri, 1);
-        ri = 0;
+        ri = Math.max(0, Math.min(ri, RIGS.length) - 1);
         rgSync();
         dirty = true;
+        rgm("Deleted " + gone + ".");
       };
       $("rgresetp").onclick = () => {
         rg().pose = { a: PA(), rot: 0, dx: 0, dy: 0 };
