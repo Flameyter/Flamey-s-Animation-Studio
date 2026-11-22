@@ -672,12 +672,14 @@
       .exinfo div + div { margin-top: 8px; }
       /* Rigs looks like Draw Cartoons 2: dark icon strip, big light stage, one big button */
       .rgscr { display: flex; background: #3b3b4c; border-radius: 12px; overflow: hidden; margin-bottom: 8px; }
-      .rgbar { width: 62px; flex: none; background: #1f2030; display: flex; flex-direction: column; align-items: stretch; }
-      .rgtab { display: flex; background: #19d37a; }
-      .rgtab select { flex: 1; min-width: 0; background: transparent; color: #fff; border: 0; border-radius: 0; font: 700 11px/1.2 sans-serif; padding: 9px 2px; margin: 0; appearance: none; -webkit-appearance: none; text-align: center; text-overflow: ellipsis; }
+      .rgbar { width: 78px; flex: none; background: #1f2030; display: flex; flex-direction: column; align-items: stretch; }
+      .rgtab { display: flex; flex-direction: column; background: #19d37a; }
+      .rgtabb { display: flex; }
+      .rgtabb button { flex: 1; }
+      .rgtab select { flex: none; width: 100%; min-width: 0; font-size: 12px !important; text-overflow: ellipsis; background: transparent; color: #fff; border: 0; border-radius: 0; font: 700 11px/1.2 sans-serif; padding: 9px 2px; margin: 0; appearance: none; -webkit-appearance: none; text-align: center; text-overflow: ellipsis; }
       .rgtab select option { color: #000; }
-      .rgtab button { width: 22px; flex: none; border: 0; border-radius: 0; background: #13b865; color: #fff; font-size: 17px; padding: 0; margin: 0; }
-      .rgt { background: transparent; border: 0; border-radius: 0; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 2px 8px; font: 700 9px/1 sans-serif; letter-spacing: 0.4px; text-transform: uppercase; margin: 0; width: 100%; }
+      .rgtab button { min-height: 28px; flex: 1; border: 0; border-radius: 0; background: #13b865; color: #fff; font-size: 17px; padding: 0; margin: 0; }
+      .rgt { background: transparent; border: 0; border-radius: 0; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 2px 8px; font: 700 11px/1 sans-serif; letter-spacing: 0.2px; text-transform: uppercase; margin: 0; width: 100%; }
       .rgt i { font-style: normal; font-size: 22px; line-height: 1; }
       .rgt.on { background: #2b2d44; box-shadow: inset 3px 0 0 #19b8f6; }
       .rgt:disabled { opacity: 0.35; }
@@ -2048,7 +2050,7 @@
       <div class="v v-rigs" hidden>
         <div class="rgscr">
           <div class="rgbar">
-            <div class="rgtab"><select id="rgsel" title="Character"></select><button id="rgnew" title="New character">＋</button></div>
+            <div class="rgtab"><select id="rgsel" title="Character"></select><div class="rgtabb"><button id="rgnew" title="New character">＋</button><button id="rgren" title="Rename this character">✎</button></div></div>
             <button class="rgt" id="rgmbn"><i>🦴</i>Bones</button>
             <button class="rgt" id="rgmpc"><i>🖼</i>Pieces</button>
             <button class="rgt" id="rgbdel"><i>🗑</i>Delete</button>
@@ -12616,6 +12618,16 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         rgCache = new Map();
       const rg = () => RIGS[ri];
       let rgSheetSet = () => {};
+      /* ✎ under the character menu: opens Editor with the name box ready to type in */
+      document.getElementById("rgren").onclick = () => {
+        rgSheetSet("ed");
+        const n = document.getElementById("rgname");
+        setTimeout(() => {
+          n.scrollIntoView({ block: "center", behavior: "smooth" });
+          n.focus();
+          n.select();
+        }, 50);
+      };
       const rgc = $("rgc"),
         rgx = rgc.getContext("2d"),
         rgm = (t) => ($("rgmsg").textContent = t),
