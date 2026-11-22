@@ -4172,6 +4172,44 @@
           return "";
         }
       }
+      /* look a font up on Google Fonts: { n: its real name, u: the font file as a data address } or null.
+         The name is tried as typed, then with capital first letters (“open sans” → “Open Sans”).
+         Answers are remembered, so a frame hat doesn’t download it again every frame. */
+      const BK_FWEB = new Map();
+      async function bkFontWeb(x) {
+        const k = String(x == null ? "" : x).trim().replace(/\s+/g, " ");
+        if (!k || k.length > 80) return null;
+        const key = k.toLowerCase();
+        if (BK_FWEB.has(key)) return BK_FWEB.get(key);
+        const tries = [k, k.replace(/\b\w/g, (c) => c.toUpperCase())].filter((q, i, a) => a.indexOf(q) === i);
+        let found = null;
+        for (const name of tries) {
+          let r;
+          try {
+            r = await fetch("https://fonts.googleapis.com/css2?family=" + encodeURIComponent(name).replace(/%20/g, "+"));
+          } catch (e) {
+            throw new Error("couldn’t reach the internet to search for fonts");
+          }
+          if (!r.ok) continue;
+          const css = await r.text(),
+            blocks = css.split("@font-face").slice(1),
+            pick = blocks.find((b, i) => /\/\*\s*latin\s*\*\//.test(css.split("@font-face")[i])) || blocks[blocks.length - 1] || "",
+            url = (pick.match(/url\((https:[^)]+)\)/) || [])[1],
+            real = ((pick.match(/font-family:\s*'([^']+)'/) || [])[1] || name).trim();
+          if (!url) continue;
+          let u;
+          try {
+            u = await fileURL(await (await fetch(url)).blob());
+          } catch (e) {
+            throw new Error("couldn’t download the font");
+          }
+          if (!FACES[real]) await fontAdd(real, u);
+          found = { n: real, u };
+          break;
+        }
+        BK_FWEB.set(key, found);
+        return found;
+      }
       /* a little card showing the font, for a few seconds */
       let bkFontCard = null;
       function bkFontPreview(key) {
@@ -4868,22 +4906,23 @@
           return "";
         } },
         /* ----- Fonts blocks -----
-           the leaf-shaped “give font” block gives the font back (or false if there is no such font) and, when you tap it,
-           shows a preview of it. Drop it into “make font from” to add that font to your Fonts list. */
-        fogive: { cat: "fonts", shape: "leaf", tpl: "give font %1 and search if font exists", a: [["str", ""]], run: (v) => {
-          const k = bkFontFind(v[0]);
-          if (k && !playing) bkFontPreview(k);
-          return k || false;
+           the leaf-shaped “give font” block searches the internet (Google Fonts) for the font, gives its name back
+           (or false if there is no such font) and, when you tap it, shows a preview of it. Drop it into
+           “make font from” to add that font to your Fonts list. */
+        fogive: { cat: "fonts", shape: "leaf", tpl: "give font %1 and search if font exists", a: [["str", ""]], run: async (v) => {
+          const f = await bkFontWeb(v[0]);
+          if (f && !playing) bkFontPreview(f.n);
+          return f ? f.n : false;
         } },
         fosay: { cat: "fonts", shape: "rep", tpl: "say \"font\" %1 times", a: [["num", "3"]], run: (v) => {
           const n = Math.max(0, Math.min(1000, Math.floor(bkNum(v[0])) || 0));
           return Array(n).fill("font").join(" ");
         } },
-        fomake: { cat: "fonts", shape: "cmd", tpl: "make font from %1", a: [["str", ""]], run: (v) => {
-          const k = v[0] === false ? "" : bkFontFind(v[0]);
-          if (!k) throw new Error("that font doesn’t exist");
-          if (TXF[k] || FONTS.some((f) => f.n === k)) return ""; /* built in, or already in your list */
-          FONTS.push({ n: k, u: null });
+        fomake: { cat: "fonts", shape: "cmd", tpl: "make font from %1", a: [["str", ""]], run: async (v) => {
+          const f = v[0] === false ? null : await bkFontWeb(v[0]);
+          if (!f) throw new Error("that font doesn’t exist");
+          if (FONTS.some((q) => q.n === f.n)) return ""; /* already in your list */
+          FONTS.push({ n: f.n, u: f.u }); /* the font file goes inside the project, so it still works offline */
           bkFontsChanged();
           return "";
         } },
