@@ -14527,7 +14527,14 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           if (de < 16 && de < bd) ((bd = de), (best = { b, g, snap: true }));
         });
         if (!best) {
-          const nb = rgNearBone(rig, G, sx, sy);
+          let nb = rgNearBone(rig, G, sx, sy);
+          /* starting right where another line begins (two arms from one shoulder): hang from what that line hangs
+             from, so the new line sits beside it instead of being stuck onto it and swinging with it */
+          for (let k = 0; k < 20 && nb && nb.shape !== "dot" && G[nb.id] && Math.hypot(sx - G[nb.id].x, sy - G[nb.id].y) < 14; k++) {
+            const up = rgBones(rig).find((q) => q.id === nb.p && !q.art);
+            if (!up || !G[up.id] || (rig.blank && up.id === "torso")) break; /* never onto the hidden root: stay on the body */
+            nb = up;
+          }
           best = { b: nb, g: G[nb.id], snap: false };
           if (nb.shape === "dot" && Math.hypot(sx - best.g.x, sy - best.g.y) <= (nb.w || 0) / 2 + 12) best.snap = true; /* inside a dot: hang from its centre */
         }
