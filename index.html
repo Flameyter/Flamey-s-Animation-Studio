@@ -4187,24 +4187,6 @@
         if (m) return parseFloat(m[0]) !== 0;
         return t.toLowerCase() !== "false";
       }
-      function bkPlaceAsset(v, b, copy) {
-        const i = parseInt(v[0], 10);
-        if (!(i >= 0 && assets[i]) || !bkUnderFrameHat(b)) return "";
-        const n = bkExp ? bkExpN : cur + 1,
-          f = LAY[ac].k[n - 1];
-        if (!f) return "";
-        const x = Math.round(bkNum(v[1])),
-          y = Math.round(bkNum(v[2]));
-        const spot = f.items.find((q) => q.a === i && q.x === x && q.y === y);
-        if (spot) return ""; /* already exactly there */
-        const old = copy ? null : f.items.find((q) => q.a === i);
-        if (old) {
-          old.x = x;
-          old.y = y;
-        } else f.items.push({ a: i, x, y, sc: 1, r: 0 });
-        if (!bkExp && n === cur + 1) ui();
-        return "";
-      }
       /* videos from links: they play on top of the picture in Watch video and Edit video (not baked into an exported file) */
       const BKV = {}; /* id -> { url, el } */
       let bkVidBox = null;
@@ -4659,12 +4641,6 @@
            0 is false, anything else is true ("0 dogs" is false, "3 dogs" is true). With words only, it is true until the word is "false".
            An empty box is false. */
         truth: { cat: "operators", shape: "bool", tpl: "%1", a: [["str", ""]], run: (v) => bkTruthy(v[0]) },
-        /* display asset at x y: MOVES the asset to x and y on the frame being played (if that asset is not on the frame yet, it is put there).
-           sticker asset at x y: makes a NEW copy of the asset and sticks it at x and y; the same asset at the same spot is only stuck once, so a loop can not pile copies up.
-           x and y are the editor's pixels (the middle of the frame is half the width and half the height). Both only work under a frame hat, like “x of character”.
-           While playing they change the project (Undo brings it back); while exporting the project is put back afterwards. */
-        displayasset: { cat: "looks", shape: "cmd", tpl: "display %1 at x: %2 y: %3", a: [["menu", "", bkAssetList], ["num", ""], ["num", ""]], run: (v, b) => bkPlaceAsset(v, b, false) },
-        stickerasset: { cat: "looks", shape: "cmd", tpl: "sticker %1 at x: %2 y: %3", a: [["menu", "", bkAssetList], ["num", ""], ["num", ""]], run: (v, b) => bkPlaceAsset(v, b, true) },
         /* set tweening for frame () to [true / false]: turns the Tween button of that frame on or off (the blue T), so the assets and text glide from it to the next frame where they move.
            Turning it on also fills the frames in between, just like pressing the button. A frame number that does not exist does nothing. */
         /* look glitch (asset) style: (RGB / Slices / Static / All): makes that asset look glitchy on the frame this runs in (like display, it needs a frame hat above it).

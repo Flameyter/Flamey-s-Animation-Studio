@@ -30,6 +30,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - `() out ()` and `() in ()` were dropped on purpose.
 - Audio blocks (`talk with audio` = play once, `add sound … as a background` = loop under the whole video, `play sound … about () times` = whole sound back to back N times, `all sounds`) must be in the exported video, because videos go to YouTube. A block never restarts its sound while it is still going (`BK_SND`); while exporting, sounds go into the recording through `bkSndOut`.
 - No physics or ragdoll blocks (Joel does that himself): the old `make () able to handle physics` block and the planned `if bounce, play sound` were dropped.
+- The Looks blocks `display () at x: () y: ()` and `sticker () at x: () y: ()` were removed (they place assets, which Joel does himself).
 - The Zipper no longer loads frames (it was slow); the Upgrades "frames eaten" counter no longer counts for new zips.
 
 ## Defaults I guessed that Joel never answered
