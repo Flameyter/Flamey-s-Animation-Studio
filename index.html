@@ -578,7 +578,7 @@
       .bkloop { position: absolute; right: 12px; top: 2px; color: #fff; font-size: 15px; line-height: 20px; }
       .bkslot.bool.empty { width: 46px; height: 24px; background: rgba(0, 0, 0, 0.25); clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%); border-radius: 0; }
       .bkblk.s-bool { height: 34px; padding: 0 14px; }
-      .bkblk.s-rep, .bkblk.s-list { height: 34px; padding: 0 14px; }
+      .bkblk.s-rep, .bkblk.s-list, .bkblk.s-leaf { height: 34px; padding: 0 14px; }
       .bkblk.nested { height: 28px; padding: 0 10px; font-size: 12px; gap: 4px; }
       .bkblk.inpal input, .bkblk.inpal select { pointer-events: none; }
       .bkblk input, .bkblk select { flex: none; height: 28px; padding: 0 8px; border-radius: 14px; border: 0; background: #fff; color: #222; font-size: 13px; text-align: center; }
@@ -4158,6 +4158,44 @@
         const b = FBUILT.find((q) => q[0] === k.toLowerCase() || q[1].toLowerCase() === k.toLowerCase());
         return b ? b[0] : k;
       }
+      /* a font the studio can use: "Clean" / a built-in one (gives its key), one added in Fonts, or one on this device */
+      function bkFontFind(x) {
+        const k = String(x == null ? "" : x).trim();
+        if (!k) return "";
+        const key = bkFontKey(k);
+        if (TXF[key]) return key;
+        const mine = FONTS.find((f) => f.n.toLowerCase() === k.toLowerCase());
+        if (mine) return mine.n;
+        try {
+          return fontHere(k) ? k : "";
+        } catch (e) {
+          return "";
+        }
+      }
+      /* a little card showing the font, for a few seconds */
+      let bkFontCard = null;
+      function bkFontPreview(key) {
+        if (bkFontCard) bkFontCard.remove();
+        const d = document.createElement("div"),
+          b = FBUILT.find((q) => q[0] === key);
+        d.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:99999;max-width:calc(100vw - 32px);background:#fff;color:#111;border:3px solid #1fb87a;border-radius:12px;padding:10px 14px;box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:none";
+        const t = document.createElement("div");
+        t.style.cssText = "font:600 12px system-ui,sans-serif;color:#1fb87a;margin-bottom:4px";
+        t.textContent = key === "sans" ? "Clean" : b ? b[1] : key;
+        const p = document.createElement("div");
+        p.style.cssText = "font-size:26px;line-height:1.25;font-family:" + txtFam(key);
+        p.textContent = "Aa Bb Cc 123";
+        d.append(t, p);
+        (document.fullscreenElement || document.body).appendChild(d);
+        bkFontCard = d;
+        setTimeout(() => d.remove(), 3000);
+      }
+      function bkFontsChanged() {
+        dirty = true;
+        try {
+          fontsFill();
+        } catch (e) {}
+      }
       /* the frame being played (or the one open in the editor), on the layer being edited */
       const bkTxtFrame = () => frames[(bkExp ? bkExpN : cur + 1) - 1] || null;
       function bkTxtChanged() {
@@ -4671,6 +4709,7 @@
         commands: { n: "Commands", c: EVC, i: "📣" },
         function: { n: "Function", c: "#2bb0a6", i: "ƒ" },
         etext: { n: "Edit text", c: "#66b234", i: "✍" },
+        fonts: { n: "Fonts", c: "#1fb87a", i: "🔤" },
         rigs: { n: "Rigs", c: "#ff5a2a", i: "🦴" },
         massets: { n: "Make assets", c: "#ffab19", i: "✚" },
         looks: { n: "Looks", c: "#9966ff", i: "👁" },
@@ -4826,6 +4865,40 @@
           }
           if (!n) throw new Error("no text called “" + k + "”");
           bkTxtChanged();
+          return "";
+        } },
+        /* ----- Fonts blocks -----
+           the leaf-shaped “give font” block gives the font back (or false if there is no such font) and, when you tap it,
+           shows a preview of it. Drop it into “make font from” to add that font to your Fonts list. */
+        fogive: { cat: "fonts", shape: "leaf", tpl: "give font %1 and search if font exists", a: [["str", ""]], run: (v) => {
+          const k = bkFontFind(v[0]);
+          if (k && !playing) bkFontPreview(k);
+          return k || false;
+        } },
+        fosay: { cat: "fonts", shape: "rep", tpl: "say \"font\" %1 times", a: [["num", "3"]], run: (v) => {
+          const n = Math.max(0, Math.min(1000, Math.floor(bkNum(v[0])) || 0));
+          return Array(n).fill("font").join(" ");
+        } },
+        fomake: { cat: "fonts", shape: "cmd", tpl: "make font from %1", a: [["str", ""]], run: (v) => {
+          const k = v[0] === false ? "" : bkFontFind(v[0]);
+          if (!k) throw new Error("that font doesn’t exist");
+          if (TXF[k] || FONTS.some((f) => f.n === k)) return ""; /* built in, or already in your list */
+          FONTS.push({ n: k, u: null });
+          bkFontsChanged();
+          return "";
+        } },
+        fodel: { cat: "fonts", shape: "cmd", tpl: "delete font %1", a: [["str", ""]], run: (v) => {
+          const k = String(v[0] == null || v[0] === false ? "" : v[0]).trim(),
+            f = FONTS.find((q) => q.n.toLowerCase() === k.toLowerCase());
+          if (!f) throw new Error(bkFontFind(k) ? "only fonts you added can be deleted" : "no font called “" + k + "”");
+          FONTS = FONTS.filter((q) => q !== f);
+          if (FACES[f.n]) {
+            try {
+              document.fonts.delete(FACES[f.n]);
+            } catch (e) {}
+            delete FACES[f.n];
+          }
+          bkFontsChanged();
           return "";
         } },
         /* ----- Make assets blocks -----
@@ -5488,7 +5561,7 @@
       };
       const bkShape = (b) => BLK[b.t].shape;
       /* round, square and pointed blocks give back a value and cannot stack; caps end a script */
-      const bkIsRep = (b) => ["rep", "list", "bool"].includes(bkShape(b));
+      const bkIsRep = (b) => ["rep", "list", "bool", "leaf"].includes(bkShape(b));
       const bkIsCap = (b) => bkShape(b) === "cap";
       /* BKS = stacks: [{ x, y, b: [{ t, v }] }]. v holds the typed values, or { r: block } for a block plugged in. */
       let BKS = [];
@@ -5716,6 +5789,11 @@
         if (shape === "rep") {
           const q = h / 2;
           return "M" + q + ",0 L" + (w - q) + ",0 A" + q + "," + q + " 0 0 1 " + (w - q) + "," + h + " L" + q + "," + h + " A" + q + "," + q + " 0 0 1 " + q + ",0 Z";
+        }
+        /* leaf: a font block (round top-right and bottom-left corners, small ones on the other two) */
+        if (shape === "leaf") {
+          const q = h / 2;
+          return "M" + r + ",0 L" + (w - q) + ",0 A" + q + "," + q + " 0 0 1 " + w + "," + q + " L" + w + "," + (h - r) + " Q" + w + "," + h + " " + (w - r) + "," + h + " L" + q + "," + h + " A" + q + "," + q + " 0 0 1 0," + q + " L0," + r + " Q0,0 " + r + ",0 Z";
         }
         if (shape === "bool") {
           const q = h / 2;
