@@ -2905,6 +2905,12 @@
       let tickAt = 0;
       /* how far through the current frame we are (0 to 1) while playing, so Tween can glide between the frames */
       const subT = () => (playing ? Math.min(0.999, ((performance.now() - tickAt) * (+$("fps").value || 8)) / 1000) : 0);
+      let audT0 = 0; /* when the sound last started from frame 1 (performance.now, ms) */
+      /* how long one round of the video and its sound is, in seconds: the video, or the last sound to end if that is later */
+      function audSpan() {
+        const fps = +$("fps").value || 8;
+        return Math.max(frames.length / fps, ...AUD.filter((a) => a.buf).map((a) => a.start / fps + audLen(a, fps)));
+      }
       function setPlay(on) {
         const wasPlaying = playing;
         if (!on) {
@@ -2917,16 +2923,22 @@
         playing = on;
         clearInterval(timer);
         audioStop();
-        if (on) audioPlay(cur);
+        if (on) {
+          audioPlay(cur);
+          audT0 = performance.now() - (cur / (+$("fps").value || 8)) * 1000;
+        }
         if (on)
           timer = setInterval(
             () => {
               tickAt = performance.now();
               cur = (cur + 1) % frames.length;
               sel = -1;
-              if (cur === 0) {
+              /* back at frame 1: start the sound again, but only once all of it has played (a sound longer than the
+                 video, like one over a 1-frame project, used to be cut off and restarted every frame) */
+              if (cur === 0 && performance.now() - audT0 >= audSpan() * 1000 - 5) {
                 audioStop();
                 audioPlay(0);
+                audT0 = performance.now();
               }
               ui();
               bkPlayFrame(cur + 1); /* Blocks: hat blocks fire as the frames play */
