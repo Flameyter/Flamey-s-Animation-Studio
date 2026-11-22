@@ -1347,23 +1347,7 @@
         <div id="fxlist"></div>
       </div>
       <div class="v v-assets" hidden>
-        <details class="pn" id="facebox">
-          <summary>🙂 Faces on assets</summary>
-          <div class="row"><select id="fcasset"></select></div>
-          <canvas id="fcc" width="320" height="240" style="aspect-ratio: 4 / 3; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0 / 20px 20px; touch-action: none"></canvas>
-          <div class="lbl">Tap or drag on the picture to place the face. Changes save as you go.</div>
-          <div class="row">
-            <label class="sl">Eyes<select id="fceyes"><option value="none">None</option><option value="round">Round</option><option value="big">Big</option><option value="dots">Dots</option><option value="happy">Happy</option><option value="closed">Closed</option></select></label>
-            <label class="sl">Mouth<select id="fcmouth"><option value="none">None</option><option value="smile">Smile</option><option value="grin">Grin</option><option value="open">Open</option><option value="flat">Flat</option><option value="sad">Sad</option><option value="shock">Shock</option></select></label>
-            <label class="sl">Lines<input type="color" id="fccol" value="#241a14" /></label>
-          </div>
-          <div class="row"><label class="sl">Face size<input type="range" id="fcsize" min="20" max="300" value="100" /></label><button id="fcno">Remove face</button></div>
-          <div id="fcmsg"></div>
-        </details>
         <div class="pn">
-          <div class="row" id="elkrow">
-            <b class="mini">Looks</b><button id="elkp" title="Previous look">◀</button><b id="elkn" style="min-width: 70px; text-align: center">Look 1 of 1</b><button id="elkx" title="Next look">▶</button><button id="elknew">＋ New look</button><button id="elkdel">🗑 Look</button>
-          </div>
           <div class="row">
             <b class="mini">Costume</b><input id="ename" placeholder="costume1" style="min-width: 100px" /><button
               class="g"
@@ -1371,14 +1355,37 @@
             >
               Save asset</button
             ><button id="enew">New</button><button class="tb" id="eundo"><i>↶</i></button
-            ><button class="tb" id="eredo"><i>↷</i></button><button class="tb" id="erl"><i>⟲</i>15°</button
-            ><button class="tb" id="err"><i>⟳</i>15°</button>
+            ><button class="tb" id="eredo"><i>↷</i></button>
           </div>
+          <div class="row" id="elkrow">
+            <b class="mini">Looks</b><button id="elkp" title="Previous look">◀</button><b id="elkn" style="min-width: 70px; text-align: center">Look 1 of 1</b><button id="elkx" title="Next look">▶</button><button id="elknew">＋ New look</button><button id="elkdel">🗑 Look</button>
+          </div>
+          <div class="ed">
+            <div class="etools">
+              <button data-et="select" class="on" title="Select">➤</button
+              ><button data-et="reshape" title="Reshape">⬉</button><button data-et="brush" title="Brush">🖌</button
+              ><button data-et="eraser" title="Eraser">🧽</button><button data-et="bucket" title="Fill">🪣</button
+              ><button data-et="text" title="Text"><b>T</b></button><button data-et="line" title="Line">╱</button
+              ><button data-et="ell" title="Circle">○</button><button data-et="rect" title="Rectangle">□</button>
+            </div>
+            <canvas id="ec" width="640" height="480"></canvas>
+          </div>
+          <input
+            id="etxt"
+            placeholder="Type text, then tap the canvas"
+            hidden
+            style="width: 100%; box-sizing: border-box; margin-top: 6px"
+          />
           <div class="row">
-            <button class="tb" id="egrp"><i>▣</i>Group</button><button class="tb" id="eungrp"><i>▢</i>Ungroup</button
-            ><button class="tb" id="efwd"><i>▲</i>Forward</button><button class="tb" id="ebwd"><i>▼</i>Backward</button
-            ><button class="tb" id="efront"><i>⤒</i>Front</button><button class="tb" id="eback"><i>⤓</i>Back</button>
+            <button id="econv">Convert to Bitmap</button><span style="flex: 1"></span
+            ><label class="up">Upload<input type="file" id="eup" accept="image/*" hidden /></label
+            ><button id="bpb" title="Backpack">🎒</button><button id="zo">−</button><button id="z1">=</button
+            ><button id="zi">+</button>
           </div>
+          <div id="emsg2" class="lbl"></div>
+        </div>
+        <div class="pn">
+          <div class="ph">Color</div>
           <div class="row">
             <b class="mini" id="flab">Fill</b><button class="cbtn" id="fbtn"><i id="fsw"></i>▾</button
             ><b class="mini" id="olab">Outline</b><button class="cbtn" id="obtn"><i id="osw"></i>▾</button
@@ -1390,9 +1397,7 @@
               max="60"
               title="Outline width"
               style="flex: 0 0 58px"
-            /><button class="tb" id="ecopy"><i>⧉</i>Copy</button><button class="tb" id="epaste"><i>⎘</i>Paste</button
-            ><button class="tb" id="edel"><i>🗑</i>Delete</button><button class="tb" id="efh"><i>⇋</i>Flip H</button
-            ><button class="tb" id="efv"><i>⇅</i>Flip V</button>
+            />
           </div>
           <div class="pop" id="epop" hidden>
             <div class="ph" id="ptitle">Fill</div>
@@ -1424,6 +1429,23 @@
             ><label class="sl">Transparency<input type="range" class="gr" id="pa2" min="0" max="100" /></label>
             <div class="row" id="psv"></div>
           </div>
+        </div>
+        <div class="pn">
+          <div class="ph">Arrange · pick something on the canvas first</div>
+          <div class="row">
+            <button class="tb" id="egrp"><i>▣</i>Group</button><button class="tb" id="eungrp"><i>▢</i>Ungroup</button
+            ><button class="tb" id="efwd"><i>▲</i>Forward</button><button class="tb" id="ebwd"><i>▼</i>Backward</button
+            ><button class="tb" id="efront"><i>⤒</i>Front</button><button class="tb" id="eback"><i>⤓</i>Back</button
+            ><button class="tb" id="erl"><i>⟲</i>15°</button><button class="tb" id="err"><i>⟳</i>15°</button>
+          </div>
+          <div class="row">
+            <button class="tb" id="ecopy"><i>⧉</i>Copy</button><button class="tb" id="epaste"><i>⎘</i>Paste</button
+            ><button class="tb" id="edel"><i>🗑</i>Delete</button><button class="tb" id="efh"><i>⇋</i>Flip H</button
+            ><button class="tb" id="efv"><i>⇅</i>Flip V</button>
+          </div>
+        </div>
+        <div class="pn">
+          <div class="ph">Size</div>
           <div class="row" id="esrow">
             <button id="esall" title="Select everything in this costume">Select all</button>
             <label class="sl" style="flex: 1 1 180px"
@@ -1437,32 +1459,24 @@
               >Height <b id="ehv"></b><input type="range" id="esh" min="10" max="400" value="100" disabled
             /></label>
           </div>
-          <div id="emsg2" class="lbl"></div>
+        </div>
+        <div class="pn">
           <div class="row" id="eprs"><b class="mini">Presets</b></div>
-          <div class="ed">
-            <div class="etools">
-              <button data-et="select" class="on" title="Select">➤</button
-              ><button data-et="reshape" title="Reshape">⬉</button><button data-et="brush" title="Brush">🖌</button
-              ><button data-et="eraser" title="Eraser">🧽</button><button data-et="bucket" title="Fill">🪣</button
-              ><button data-et="text" title="Text"><b>T</b></button><button data-et="line" title="Line">╱</button
-              ><button data-et="ell" title="Circle">○</button><button data-et="rect" title="Rectangle">□</button>
-            </div>
-            <canvas id="ec" width="640" height="480"></canvas>
-          </div>
-          <input
-            id="etxt"
-            placeholder="Type text, then tap the canvas"
-            hidden
-            style="width: 100%; box-sizing: border-box; margin-top: 6px"
-          />
-          <div class="row">
-            <button class="rbtn" id="econv">Convert to Bitmap</button><span style="flex: 1"></span
-            ><label class="up">Upload<input type="file" id="eup" accept="image/*" hidden /></label
-            ><button id="bpb" title="Backpack">🎒</button><button id="zo">−</button><button id="z1">=</button
-            ><button id="zi">+</button>
-          </div>
           <div class="pn" id="bpt" hidden></div>
         </div>
+        <details class="pn" id="facebox">
+          <summary>🙂 Faces on assets</summary>
+          <div class="row"><select id="fcasset"></select></div>
+          <canvas id="fcc" width="320" height="240" style="aspect-ratio: 4 / 3; background: repeating-conic-gradient(#8883 0 25%, transparent 0 50%) 0 0 / 20px 20px; touch-action: none"></canvas>
+          <div class="lbl">Tap or drag on the picture to place the face. Changes save as you go.</div>
+          <div class="row">
+            <label class="sl">Eyes<select id="fceyes"><option value="none">None</option><option value="round">Round</option><option value="big">Big</option><option value="dots">Dots</option><option value="happy">Happy</option><option value="closed">Closed</option></select></label>
+            <label class="sl">Mouth<select id="fcmouth"><option value="none">None</option><option value="smile">Smile</option><option value="grin">Grin</option><option value="open">Open</option><option value="flat">Flat</option><option value="sad">Sad</option><option value="shock">Shock</option></select></label>
+            <label class="sl">Lines<input type="color" id="fccol" value="#241a14" /></label>
+          </div>
+          <div class="row"><label class="sl">Face size<input type="range" id="fcsize" min="20" max="300" value="100" /></label><button id="fcno">Remove face</button></div>
+          <div id="fcmsg"></div>
+        </details>
       </div>
 
       <div class="v v-audio" hidden>
