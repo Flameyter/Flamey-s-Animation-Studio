@@ -8,7 +8,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - Joel's YouTube channel: **Flamey :)**, https://www.youtube.com/@CrazyPWAF (about 2.65K subscribers). Videos made in the studio go here.
 
 ## Version
-- The version is shown at the bottom of the main menu (`#studiover`, "Version 5.93"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
+- The version is shown at the bottom of the main menu (`#studiover`, "Version 5.94"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
 
 ## Checking your work
 - Syntax: pull the inline scripts out into one file and run `node --check` on it.
@@ -37,6 +37,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - `() of ()` is the mod block. `() uses ()` has the text first, the part second. The grey keep blocks and the yellow command blocks live in their own categories; the `when <>` hat is the only block in Function. The C-shaped `when <>` is an if block and stays in Control.
 - `() out ()` and `() in ()` were dropped on purpose.
 - Audio blocks (`talk with audio` = play once, `add sound … as a background` = loop under the whole video, `play sound … about () times` = whole sound back to back N times, `all sounds`) must be in the exported video, because videos go to YouTube. A block never restarts its sound while it is still going (`BK_SND`); while exporting, sounds go into the recording through `bkSndOut`.
+- Weather extension (`id: "weather"`, add-on for Effects): adds a Weather group to Add an effect. 🌧 Rain = Joel's own hand-drawn GIF (only its blue rain, 11 frames at 10 a second, `RAIN`, `rainDraw`), stretched over the picture and looping. More weather effects go in the same group.
 - No physics or ragdoll blocks (Joel does that himself): the old `make () able to handle physics` block and the planned `if bounce, play sound` were dropped.
 - The Looks blocks `display () at x: () y: ()` and `sticker () at x: () y: ()` were removed (they place assets, which Joel does himself).
 - The Zipper no longer loads frames (it was slow); the Upgrades "frames eaten" counter no longer counts for new zips.
