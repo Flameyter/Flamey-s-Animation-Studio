@@ -1661,6 +1661,7 @@
               <li>Draw your own head in Make assets, then pick it with <b>Use as head</b>.</li>
               <li><b>Tool strip:</b> the strip on the left is your toolbox. <b>Pieces</b> and <b>Bones</b> switch what the big button does, <b>Poses</b> loads and saves poses, <b>Animate</b> makes the movie, and <b>Editor</b> holds colours, body parts and the number options. Tap a tool again to close it. The green <b>＋</b> makes another blank character.</li>
               <li><b>Make your own character:</b> <b>Bones</b> are the structure and <b>Pieces</b> are the skin. In <b>Bones</b>, tap <b>＋ LINE</b> and drag for a thin line (arms, legs, neck, tail), or tap <b>● DOT</b> and tap the stage for a massive dot (head, body); drag out from where you tap to make it bigger. Start a new line on a dot or on another line and it joins it. Drag a blue dot to bend a bone. Then tap <b>Pieces</b>: tap a bone's blue dot to pick it, tap <b>＋ ADD PIECE</b> and pick a shape or a drawing, and the skin lands on that bone and moves with it. You can also drag a piece onto any bone. <b>⤢ Fit to bone</b> sizes it to the bone. <b>＋ Look</b> (or several looks drawn into one asset in Make assets) gives a piece another picture (a different face, say): tap the piece to switch to the next look, and in Edit video pick the look for each frame under the character. A horse: one big dot for the body, a dot for the head, lines for four legs, a neck and a tail.</li>
+              <li><b>🔗 Connect</b> changes what a bone hangs from: tap 🔗, tap the bone, then tap the bone or dot it should hang from. Nothing jumps, and your saved poses still look the same. Tap the same bone twice to unhook it. A bone can't hang from something that hangs from it.</li>
               <li><b>Bones:</b> tap a blue dot to pick a bone (it turns pink). <b>New bone</b> lets you drag out your own bones, starting on a dot or on any bone. <b>Attach picture</b> ties one of your assets to the picked bone so it moves with it. <b>Invisible bone</b> hides the stick so only the picture shows.</li>
             </ul>
           </details>
@@ -2072,6 +2073,7 @@
             <button class="rgt" id="rgmpc"><i>🖼</i>Pieces</button>
             <button class="rgt" id="rgbdel"><i>🗑</i>Delete</button>
             <button class="rgt" id="rgflipb"><i>⇋</i>Flip</button>
+            <button class="rgt" id="rgconn" title="Hang a bone from another joint"><i>🔗</i>Connect</button>
             <button class="rgt" data-sh="pose"><i>🧍</i>Poses</button>
             <button class="rgt" data-sh="anim"><i>🎬</i>Animate</button>
             <button class="rgt" data-sh="ed"><i>🎛</i>Editor</button>
@@ -13171,8 +13173,112 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         const r = rgc.getBoundingClientRect();
         return [((e.clientX - r.left) * 640) / r.width, ((e.clientY - r.top) * 480) / r.height];
       };
+      /* ===== 🔗 Connect: tap a bone, then tap the bone or dot it should hang from. Nothing jumps: the bone stays
+         where it is on the stage and from then on moves with its new joint. Tap the same bone twice to unhook it
+         (it then hangs from the character itself). A bone can't hang from itself or from anything hanging below it. ===== */
+      let rgConn = null;
+      function rgConnSet(v) {
+        rgConn = v;
+        const b = document.getElementById("rgconn");
+        if (b) b.classList.toggle("on", !!v);
+      }
+      /* the bone (or dot) under a tap: only real bones you drew, within a finger's width */
+      function rgConnHit(rig, G, x, y, skip) {
+        let best = null, bd = 22;
+        (rig.extra || []).forEach((b) => {
+          const g = G[b.id];
+          if (!g || b.art || (skip && skip.has(b.id))) return;
+          const ux = g.ex - g.x, uy = g.ey - g.y,
+            t = Math.max(0, Math.min(1, ((x - g.x) * ux + (y - g.y) * uy) / (ux * ux + uy * uy || 1))),
+            d = b.shape === "dot" ? Math.max(0, Math.hypot(x - g.x, y - g.y) - (b.w || 0) / 2) : Math.hypot(x - (g.x + ux * t), y - (g.y + uy * t));
+          if (d < bd) ((bd = d), (best = b));
+        });
+        return best;
+      }
+      const rgKidsOf = (rig, id) => {
+        const out = new Set([id]);
+        let ch = true;
+        while (ch) {
+          ch = false;
+          (rig.extra || []).forEach((q) => {
+            if (!out.has(q.id) && out.has(q.p)) (out.add(q.id), (ch = true));
+          });
+        }
+        return out;
+      };
+      function rgHangOn(rig, e, pid) {
+        const angOf = (pose) => rgSkel(rig, rgFull(pose))[e.id].a;
+        /* remember how this bone is turned in every saved pose and on every frame, so they still look the same after */
+        const keep = [];
+        (rig.poses || []).forEach((P) => P.pose && keep.push([P.pose, angOf(P.pose)]));
+        LAY.forEach((L) => (L.k || []).forEach((f) => (f.items || []).forEach((it) => it.rig === rig.id && it.pose && keep.push([it.pose, angOf(it.pose)]))));
+        const G = rgSkel(rig, rig.pose),
+          w = G[e.id];
+        rgPlace(rig, e, G, w.x, w.y, w.a - ((rig.pose.a && rig.pose.a[e.id]) || 0), pid);
+        keep.forEach(([pose, a0]) => {
+          const d = ((((a0 - angOf(pose) + 180) % 360) + 360) % 360) - 180;
+          if (Math.abs(d) > 0.01) {
+            pose.a = pose.a || {};
+            pose.a[e.id] = Math.round(((pose.a[e.id] || 0) + d) * 100) / 100;
+          }
+        });
+        dirty = true;
+      }
+      document.getElementById("rgconn").onclick = () => {
+        if (rgConn) {
+          rgConnSet(null);
+          return rgm("Connect is off.");
+        }
+        const rig = rg();
+        if (!(rig.extra || []).some((q) => !q.art)) return rgm("Draw some bones first, then use Connect to change what they hang from.");
+        if (rgMode !== "bones") rgSetMode("bones");
+        rgBoneMode = false;
+        rgConnSet({ step: 1 });
+        rgBonesUi();
+        rgm("🔗 Connect: tap the bone you want to move.");
+      };
       rgc.addEventListener("pointerdown", (e) => {
         const p = rgp(e);
+        if (rgConn) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const rig = rg(),
+            G = rgSkel(rig, rig.pose),
+            x = ((p[0] - RG_CX) / RG_S) * (rig.flip ? -1 : 1) - (rig.pose.dx || 0),
+            y = (p[1] - RG_CY) / RG_S;
+          if (rgConn.step === 1) {
+            const b = rgConnHit(rig, G, x, y);
+            if (!b) return rgm("🔗 Tap right on a bone or dot you drew.");
+            rgConn = { step: 2, id: b.id };
+            rgSel = b.id;
+            rgBonesUi();
+            return rgm("🔗 Now tap the bone or dot “" + b.name + "” should hang from. Tap " + b.name + " again to unhook it.");
+          }
+          const e1 = (rig.extra || []).find((q) => q.id === rgConn.id);
+          if (!e1) return rgConnSet(null);
+          const hitSelf = rgConnHit(rig, G, x, y);
+          if (hitSelf === e1) {
+            rgHangOn(rig, e1, "torso");
+            rgConnSet(null);
+            rgPartsUi();
+            return rgm("🔗 " + e1.name + " is unhooked: it hangs from the character itself now.");
+          }
+          const kids = rgKidsOf(rig, e1.id),
+            t = rgConnHit(rig, G, x, y, kids);
+          if (!t) {
+            const under = rgConnHit(rig, G, x, y);
+            return rgm(under ? "🔗 " + e1.name + " can't hang from " + under.name + ": " + under.name + " already hangs from it." : "🔗 Tap right on a bone or dot.");
+          }
+          if (t.id === e1.p) {
+            rgConnSet(null);
+            return rgm("🔗 " + e1.name + " already hangs from " + t.name + ".");
+          }
+          rgHangOn(rig, e1, t.id);
+          rgConnSet(null);
+          rgSel = e1.id;
+          rgPartsUi();
+          return rgm("🔗 " + e1.name + " now hangs from " + t.name + ". Bend " + t.name + " and it follows.");
+        }
         if (rgMode === "pieces") {
           const rg1 = rg(), fl1 = rg1.flip ? -1 : 1, rootH = rgHandles.find((h) => h.id === "root");
           if (!(rootH && Math.hypot(p[0] - rootH.x, p[1] - rootH.y) < rootH.r + 4)) {
@@ -14138,6 +14244,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       function rgSetMode(m) {
         rgMode = m;
         rgBoneMode = false;
+        if (typeof rgConnSet === "function") rgConnSet(null);
         rgBonesUi();
       }
       function rgPiecesUi() {
@@ -14296,6 +14403,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       $("rgbodyb").onclick = () => rgSetBody(true);
       const rgRealBones = (rig) => rgBones(rig).filter((b) => !b.art && b.id !== "torso");
       $("rgbnew").onclick = () => {
+        rgConnSet(null);
         if (rgMode === "pieces") {
           if (!rgRealBones(rg()).length) {
             rgSetMode("bones");
@@ -14313,6 +14421,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         rgm(rgBoneMode ? "Drag on the stage to draw a thin line. Start on a dot or line to join it." : "Done drawing bones.");
       };
       $("rgbdot").onclick = () => {
+        rgConnSet(null);
         rgBoneMode = !(rgBoneMode && rgDotMode);
         rgDotMode = true;
         rgBonesUi();
