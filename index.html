@@ -2147,7 +2147,7 @@
         </div>
         <div class="pn rgsh s-ed">
           <div class="ph">Picked bone</div>
-          <div class="row"><label class="sl">Thickness / size<input type="range" id="rgbw" min="2" max="200" value="6" /></label><label class="sl">Colour<input type="color" id="rgbcol" value="#241a14" /></label></div>
+          <div class="row"><label class="sl">Thickness / size<input type="range" id="rgbw" min="2" max="260" value="6" /></label><label class="sl">Colour<input type="color" id="rgbcol" value="#241a14" /></label></div>
           <div class="row"><input id="rgbname" placeholder="Bone name" /><label class="sl">Length<input type="range" id="rgblen" min="8" max="220" value="60" /></label><label class="sl" style="flex: 1 1 110px"><input type="checkbox" id="rgbinv" style="width: auto" /> Invisible bone</label></div>
         </div>
         <div class="pn rgsh s-ed">
@@ -13159,10 +13159,27 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           }
           x.beginPath();
           if (rgNew.dot) {
-            const dr = Math.max(8, Math.hypot(rgNew.ex - rgNew.sx, rgNew.ey - rgNew.sy) * 1) * RG_S;
-            x.arc(RG_CX + fl * RG_S * ((pose.dx || 0) + rgNew.sx), RG_CY + RG_S * rgNew.sy, dr < 20 ? 35 * RG_S : dr, 0, 7);
+            const dia = rgDotDia(Math.hypot(rgNew.ex - rgNew.sx, rgNew.ey - rgNew.sy)),
+              cx = RG_CX + fl * RG_S * ((pose.dx || 0) + rgNew.sx),
+              cy = RG_CY + RG_S * rgNew.sy;
+            x.arc(cx, cy, (dia / 2) * RG_S, 0, 7);
             x.fillStyle = "rgba(255,70,170,.35)";
             x.fill();
+            /* the size you'll get, while you drag */
+            x.save();
+            x.font = "700 15px system-ui, sans-serif";
+            const lab = "Size " + dia,
+              tw = x.measureText(lab).width,
+              ly = Math.max(18, cy - (dia / 2) * RG_S - 14);
+            x.fillStyle = "rgba(0,0,0,.72)";
+            x.fillRect(cx - tw / 2 - 8, ly - 13, tw + 16, 26);
+            x.fillStyle = "#fff";
+            x.textAlign = "center";
+            x.textBaseline = "middle";
+            x.fillText(lab, cx, ly + 1);
+            x.restore();
+            x.beginPath();
+            x.arc(cx, cy, (dia / 2) * RG_S, 0, 7);
           } else {
             /* the preview starts on the joint it will snap to, so what you see is what you get */
             x.moveTo(RG_CX + fl * RG_S * ((pose.dx || 0) + (mj ? mj.x : rgNew.sx)), RG_CY + RG_S * (mj ? mj.y : rgNew.sy));
@@ -14697,12 +14714,14 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       /* ===== magnet joints: shaky hands don't have to hit a joint exactly. Near the end of a line, the start of a line
          or a dot, a new line (or dot) starts exactly on that joint. RG_MAG is how close counts (in stage units). ===== */
       const RG_MAG = 30;
+      /* a dot's size (how wide it is) from how far you dragged: one rule for the preview and the real dot.
+         A tap (barely moving) gives a normal dot (70); a drag makes it as wide as you dragged, from 16 to 260. */
+      const rgDotDia = (drag) => (drag < 6 ? 70 : Math.max(16, Math.min(260, Math.round(drag * 2))));
       function rgJointAt(rig, G, x, y) {
         let best = null, bd = RG_MAG;
-        const realB = rgBones(rig).some((q) => !q.art && q.id !== "torso");
         rgBones(rig).forEach((b) => {
           const g = G[b.id];
-          if (!g || b.art || (realB && rig.blank && b.id === "torso")) return;
+          if (!g || b.art || (rig.blank && b.id === "torso")) return; /* never the hidden starting bone */
           if (b.shape === "dot") return; /* dots: see below */
           [[g.ex, g.ey], [g.x, g.y]].forEach(([px, py]) => {
             const d = Math.hypot(x - px, y - py);
@@ -14775,7 +14794,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       }
       function rgAddDot(n) {
         const rig = rg(), pose = rig.pose, G = rgSkel(rig, pose), drag = Math.hypot(n.ex - n.sx, n.ey - n.sy),
-          d = drag < 12 ? 70 : Math.max(16, Math.min(260, Math.round(drag * 2))), st = rgBoneStart(rig, G, n.sx, n.sy);
+          d = rgDotDia(drag), st = rgBoneStart(rig, G, n.sx, n.sy);
         const id = "x" + Math.random().toString(36).slice(2, 8), nb = (rig.extra || []).filter((q) => !q.art).length + 1;
         rig.extra = rig.extra || [];
         rig.extra.push({ id, name: "Dot " + nb, p: st.p, at: st.at, oa: st.oa, ox: st.ox, rel: 0, len: 0, w: d, color: "#241a14", shape: "dot", front: true, img: null });
