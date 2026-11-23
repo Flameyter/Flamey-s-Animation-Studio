@@ -688,6 +688,9 @@
       .rgt i { font-style: normal; font-size: 22px; line-height: 1; }
       .rgt.on { background: #2b2d44; box-shadow: inset 3px 0 0 #19b8f6; }
       .rgt:disabled { opacity: 0.35; }
+      .rgur { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; z-index: 2; }
+      .rgur button { width: 40px; height: 36px; padding: 0; margin: 0; border: 0; border-radius: 8px; background: #2b2d44; color: #fff; font: 700 18px/1 sans-serif; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
+      .rgur button:disabled { opacity: 0.3; }
       .rgstage { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; padding-bottom: 40px; }
       #rgc { width: 100%; display: block; aspect-ratio: 4 / 3; background: #f6f6f6; touch-action: none; }
       .rgbig { position: absolute; top: 8px; right: 8px; background: #19b8f6; color: #fff; border: 0; border-radius: 6px; padding: 9px 12px; font: 800 13px/1.15 sans-serif; letter-spacing: 0.4px; margin: 0; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
@@ -1661,6 +1664,7 @@
               <li>Draw your own head in Make assets, then pick it with <b>Use as head</b>.</li>
               <li><b>Tool strip:</b> the strip on the left is your toolbox. <b>Pieces</b> and <b>Bones</b> switch what the big button does, <b>Poses</b> loads and saves poses, <b>Animate</b> makes the movie, and <b>Editor</b> holds colours, body parts and the number options. Tap a tool again to close it. The green <b>＋</b> makes another blank character.</li>
               <li><b>Make your own character:</b> <b>Bones</b> are the structure and <b>Pieces</b> are the skin. In <b>Bones</b>, tap <b>＋ LINE</b> and drag for a thin line (arms, legs, neck, tail), or tap <b>● DOT</b> and tap the stage for a massive dot (head, body); drag out from where you tap to make it bigger. Start a new line on a dot or on another line and it joins it. Drag a blue dot to bend a bone. Then tap <b>Pieces</b>: tap a bone's blue dot to pick it, tap <b>＋ ADD PIECE</b> and pick a shape or a drawing, and the skin lands on that bone and moves with it. You can also drag a piece onto any bone. <b>⤢ Fit to bone</b> sizes it to the bone. <b>＋ Look</b> (or several looks drawn into one asset in Make assets) gives a piece another picture (a different face, say): tap the piece to switch to the next look, and in Edit video pick the look for each frame under the character. A horse: one big dot for the body, a dot for the head, lines for four legs, a neck and a tail.</li>
+              <li><b>↶ Undo / ↷ Redo</b> (top-left of the stage, or Ctrl + Z / Ctrl + Y) take back any change to a character: bones, dots, pieces, bends, Connect, colours and its name. Each character has its own history.</li>
               <li><b>Magnet joints</b>: start a new line anywhere near a joint (the end or start of a line) and it snaps exactly onto it. A green ring shows the joint while you drag. Start it inside a dot to hang it from the dot. Your hand doesn't have to be steady.</li>
               <li><b>🔗 Connect</b> changes what a bone hangs from: tap 🔗, tap the bone, then tap the bone or dot it should hang from. Nothing jumps, and your saved poses still look the same. A bone can't hang from something that hangs from it.</li>
               <li><b>✂ Disconnect</b>: tap ✂, then tap a bone. It stops moving with the bone it hangs from and stays put (it still moves when the whole character moves). Use 🔗 to connect it again.</li>
@@ -2083,6 +2087,7 @@
           </div>
           <div class="rgstage">
             <canvas id="rgc" width="640" height="480"></canvas>
+            <div class="rgur"><button id="rgundo" title="Undo (Ctrl+Z)" disabled>↶</button><button id="rgredo" title="Redo (Ctrl+Y)" disabled>↷</button></div>
             <button id="rgbnew" class="rgbig">＋ LINE</button>
             <button id="rgbdot" class="rgbig">● DOT</button>
             <div id="rgpl"></div>
@@ -3167,7 +3172,7 @@
       $("last").onclick = () => nav(frames.length - 1);
       /* ===== Keyboard shortcuts (like a real studio). Not while typing in a box, and not on Imagination (it has its own keys).
          Space: play / stop · ← →: previous / next frame · Home / End: first / last frame
-         Ctrl+Z: undo · Ctrl+Shift+Z or Ctrl+Y: redo (Edit video and Make assets) · ?: show this list ===== */
+         Ctrl+Z: undo · Ctrl+Shift+Z or Ctrl+Y: redo (Edit video, Make assets and Rigs) · ?: show this list ===== */
       const KEYS_PLAY = ["", "watch", "edit", "audio", "camera", "effects"];
       function keysHelp() {
         const old = document.getElementById("keyshelp");
@@ -3190,7 +3195,7 @@
         const mod = e.ctrlKey || e.metaKey;
         if (mod && !e.altKey && (e.key === "z" || e.key === "Z" || e.key === "y" || e.key === "Y")) {
           const redo = e.key === "y" || e.key === "Y" || e.shiftKey,
-            b = view === "assets" ? $(redo ? "eredo" : "eundo") : view === "edit" ? $(redo ? "ur" : "uu") : null;
+            b = view === "assets" ? $(redo ? "eredo" : "eundo") : view === "edit" ? $(redo ? "ur" : "uu") : view === "rigs" ? $(redo ? "rgredo" : "rgundo") : null;
           if (!b) return;
           e.preventDefault();
           b.click();
@@ -13478,6 +13483,98 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           rgDrag = null;
         }),
       );
+      /* ===== Undo / Redo in Rigs: every change to a character (bones, dots, pieces, bends, connects, colours, name...)
+         can be taken back. Each character has its own history (up to 60 steps). A step is saved when a tap, drag or
+         typing actually changed something. ===== */
+      const RGH = new Map(); /* rig id -> { u: [snapshots], r: [snapshots] } */
+      const rgHist = (rig) => RGH.get(rig.id) || (RGH.set(rig.id, { u: [], r: [] }), RGH.get(rig.id));
+      const rgSnapOf = (rig) => ({
+        name: rig.name, look: { ...rig.look }, view: rig.view, flip: rig.flip, size: rig.size, blank: rig.blank, head: rig.head,
+        hide: { ...(rig.hide || {}) }, pose: rgCopy(rig.pose),
+        poses: (rig.poses || []).map((P) => ({ ...P, pose: rgCopy(P.pose) })),
+        extra: (rig.extra || []).map((e) => ({ ...e })),
+      });
+      const rgSigOf = (rig) => {
+        try {
+          return rgKey(rig, rig.pose) + "|" + rig.name + "|" + (rig.poses || []).map((P) => P.n + JSON.stringify(P.pose)).join(";");
+        } catch (e) {
+          return Math.random() + "";
+        }
+      };
+      let rgPend = null; /* the character as it was when this tap / drag / typing started */
+      function rgHistStart() {
+        if (view !== "rigs") return;
+        if (rgPend) rgHistEnd(); /* close the step before (a tap on LINE, say) so it can't swallow this one */
+        const rig = rg();
+        rgPend = { rig, snap: rgSnapOf(rig), sig: rgSigOf(rig) };
+      }
+      function rgHistEnd(only) {
+        if (!rgPend || (only && rgPend !== only)) return; /* a late timer only closes the step it was made for */
+        const { rig, snap, sig } = rgPend;
+        rgPend = null;
+        if (rgSigOf(rig) === sig) return; /* nothing changed */
+        const h = rgHist(rig);
+        h.u.push(snap);
+        if (h.u.length > 60) h.u.shift();
+        h.r = [];
+        rgHistUi();
+      }
+      function rgHistApply(rig, snap) {
+        const c = { ...snap, look: { ...snap.look }, hide: { ...snap.hide }, pose: rgCopy(snap.pose), poses: snap.poses.map((P) => ({ ...P, pose: rgCopy(P.pose) })), extra: snap.extra.map((e) => ({ ...e })) };
+        Object.assign(rig, c);
+        rgSel = null;
+        rgPc = null;
+        rgCache = new Map();
+        dirty = true;
+        rgSync();
+      }
+      function rgHistUi() {
+        const h = rgHist(rg());
+        $("rgundo").disabled = !h.u.length;
+        $("rgredo").disabled = !h.r.length;
+      }
+      $("rgundo").onclick = () => {
+        rgHistEnd();
+        const rig = rg(), h = rgHist(rig);
+        if (!h.u.length) return rgm("Nothing to undo.");
+        h.r.push(rgSnapOf(rig));
+        rgHistApply(rig, h.u.pop());
+        rgHistUi();
+        rgm("↶ Undone.");
+      };
+      $("rgredo").onclick = () => {
+        rgHistEnd();
+        const rig = rg(), h = rgHist(rig);
+        if (!h.r.length) return rgm("Nothing to redo.");
+        h.u.push(rgSnapOf(rig));
+        rgHistApply(rig, h.r.pop());
+        rgHistUi();
+        rgm("↷ Redone.");
+      };
+      {
+        const vr = document.querySelector(".v-rigs"),
+          skip = (t) => t && t.closest && t.closest("#rgundo, #rgredo, #rgsel, #rgnew, #rgdel");
+        /* start: before anything inside Rigs reacts (capture); end: after it has (bubble, then a moment later) */
+        vr.addEventListener("pointerdown", (e) => skip(e.target) || rgHistStart(), true);
+        vr.addEventListener("focusin", (e) => skip(e.target) || !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "") || rgPend || rgHistStart(), true);
+        const later = () => {
+          const tok = rgPend;
+          if (tok) setTimeout(() => rgHistEnd(tok), 0);
+        };
+        /* leaving a box (focusout) only ends a step for typing boxes: a button losing focus when you tap the stage must
+           not cut the drag that is just starting */
+        ["pointerup", "pointercancel", "click", "change", "focusout", "keyup"].forEach((ev) =>
+          vr.addEventListener(ev, (e) => skip(e.target) || ((ev === "focusout" || ev === "keyup") && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "")) || later()),
+        );
+        document.addEventListener("pointerup", later); /* a drag that ends outside the stage */
+        vr.addEventListener("input", () => {
+          clearTimeout(vr.__ht);
+          const tok = rgPend;
+          vr.__ht = setTimeout(() => {
+            if (tok && rgPend === tok) (rgHistEnd(tok), rgHistStart()); /* typing a name: one step per pause */
+          }, 600);
+        });
+      }
       /* controls */
       const LOOKS = { rgskin: "skin", rghair: "hair", rgshirt: "shirt", rgpants: "pants", rgshoes: "shoes", rgline: "line" };
       function rgSync() {
@@ -13491,6 +13588,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           sl.appendChild(o);
         });
         sl.value = ri;
+        if (typeof rgHistUi === "function") rgHistUi();
         $("rgname").value = rig.name;
         Object.keys(LOOKS).forEach((id) => ($(id).value = rig.look[LOOKS[id]]));
         $("rghs").value = rig.look.hairStyle;
@@ -13569,6 +13667,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       $("rgsel").onchange = () => {
         ri = +$("rgsel").value || 0;
         rgSync();
+        rgHistUi();
       };
       $("rgnew").onclick = () => {
         try {
