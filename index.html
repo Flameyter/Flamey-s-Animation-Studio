@@ -1108,7 +1108,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 5.9</div>
+      <div id="studiover">Version 5.91</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -12983,7 +12983,12 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
               seg(g, e.w, e.color);
             }
           },
-          extras = (front) => (rig.extra || []).filter((e) => !!e.front === front).forEach(part),
+          /* a character you built (blank body): no hidden "behind / in front" marks. Bones go under all the skin, and the
+             pieces stack in their list order (⬆ Front / ⬇ Back change it). The old cartoon body keeps its marks. */
+          extras = (front) =>
+            rig.blank
+              ? front || ((rig.extra || []).filter((e) => !e.art).forEach(part), (rig.extra || []).filter((e) => e.art).forEach(part))
+              : (rig.extra || []).filter((e) => !!e.front === front).forEach(part),
           vis = (k, fn) => {
             if (!hide[k]) fn();
           };
@@ -14796,12 +14801,14 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       $("rgpsml").onclick = () => rgScale(0.87);
       $("rgptl").onclick = () => rgTurn(-15);
       $("rgptr").onclick = () => rgTurn(15);
+      /* ⬆ Front: on top of every other piece. ⬇ Back: under all of them. One tap, no hidden marks in the way. */
       const rgStack = (dir) => rgTweak((e, b, rig) => {
-        const list = rig.extra, i = list.indexOf(e);
-        let j = i + dir;
-        while (j >= 0 && j < list.length && !list[j].art) j += dir;
-        if (j < 0 || j >= list.length) return;
-        [list[i], list[j]] = [list[j], list[i]];
+        const list = rig.extra;
+        list.splice(list.indexOf(e), 1);
+        if (dir > 0) list.push(e);
+        else list.splice(list.findIndex((q) => q.art) < 0 ? list.length : list.findIndex((q) => q.art), 0, e);
+        e.front = dir > 0;
+        rgm("“" + (e.name || "This piece") + "” is now " + (dir > 0 ? "in front of" : "behind") + " every other piece.");
       });
       $("rgpup").onclick = () => rgStack(1);
       $("rgpdn").onclick = () => rgStack(-1);
