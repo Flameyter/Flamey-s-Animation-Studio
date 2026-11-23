@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 5.92</div>
+      <div id="studiover">Version 5.93</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2496,8 +2496,9 @@
          phi = how far from straight up it points, so turning still lines it up with the finger */
       function knobPt(it, a, off) {
         const P = quadPts(it, a),
-          mx = (P[0][0] + P[1][0]) / 2,
-          my = (P[0][1] + P[1][1]) / 2,
+          B = hasQ(it) ? null : itBox(it, a),
+          mx = B ? B.ox : (P[0][0] + P[1][0]) / 2,
+          my = B ? B.oy - B.hh : (P[0][1] + P[1][1]) / 2,
           l = Math.hypot(mx, my) || 1,
           ux = hasQ(it) && l > 1 ? mx / l : 0,
           uy = hasQ(it) && l > 1 ? my / l : -1;
@@ -2708,6 +2709,41 @@
           $(l).textContent = Math.round(v * 100) + "%";
         });
       }
+      /* the selection box of a thing on the frame, in its own (unturned) space: { ox, oy, hw, hh } = middle and half size.
+         Most things use their whole picture. A character's picture is a big empty sheet, so its box hugs the
+         character itself (worked out from the pixels, and remembered for each pose). */
+      const BOXC = new WeakMap();
+      function itBox(it, a) {
+        const w = iw(it, a), h = ih(it, a), full = { ox: 0, oy: 0, hw: w / 2, hh: h / 2 };
+        if (!(it.rig && it.pose) || hasQ(it) || typeof RIGS === "undefined") return full;
+        const rig = RIGS.find((r) => r.id === it.rig);
+        if (!rig) return full;
+        let c;
+        try {
+          c = rgLive(rig, it);
+        } catch (e) {
+          return full;
+        }
+        let bb = BOXC.get(c);
+        if (!bb) {
+          const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+          let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+          for (let y = 0; y < c.height; y += 2)
+            for (let x = 0; x < c.width; x += 2)
+              if (d[(y * c.width + x) * 4 + 3] > 8) {
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+              }
+          const pad = 10;
+          bb = x1 < 0 ? null : [Math.max(0, x0 - pad), Math.max(0, y0 - pad), Math.min(c.width, x1 + pad), Math.min(c.height, y1 + pad), c.width, c.height];
+          BOXC.set(c, bb);
+        }
+        if (!bb) return full;
+        const [x0, y0, x1, y1, cw, ch] = bb;
+        return { ox: (((x0 + x1) / 2) / cw - 0.5) * w, oy: (((y0 + y1) / 2) / ch - 0.5) * h, hw: (((x1 - x0) / cw) * w) / 2, hh: (((y1 - y0) / ch) * h) / 2 };
+      }
       function inItem(it, a, x, y) {
         const t = (-it.r * Math.PI) / 180,
           dx = x - it.x,
@@ -2715,7 +2751,8 @@
           lx = dx * Math.cos(t) - dy * Math.sin(t),
           ly = dx * Math.sin(t) + dy * Math.cos(t);
         if (hasQ(it)) return inPoly(quadPts(it, a), lx, ly);
-        return Math.abs(lx) < iw(it, a) / 2 && Math.abs(ly) < ih(it, a) / 2;
+        const B = itBox(it, a);
+        return Math.abs(lx - B.ox) < B.hw && Math.abs(ly - B.oy) < B.hh;
       }
       function layerCtx() {
         const f = F();
@@ -2966,7 +3003,10 @@
               QP.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])));
               g.closePath();
               g.stroke();
-            } else g.strokeRect(-w / 2, -h / 2, w, h);
+            } else {
+              const B = itBox(it, a);
+              g.strokeRect(B.ox - B.hw, B.oy - B.hh, 2 * B.hw, 2 * B.hh);
+            }
             g.setLineDash([]);
             const KN = knobPt(it, a, rotOff(cv));
             g.beginPath();
@@ -2988,7 +3028,13 @@
                 g.fill();
                 g.stroke();
               });
-            } else if (!hasQ(it)) hdlDraw(g, hdlPts(cv, w, h), hpx(cv) * 0.6, true);
+            } else if (!hasQ(it)) {
+              const B = itBox(it, a);
+              g.save();
+              g.translate(B.ox, B.oy);
+              hdlDraw(g, hdlPts(cv, 2 * B.hw, 2 * B.hh), hpx(cv) * 0.6, true);
+              g.restore();
+            }
             g.restore();
           }
         } else if (view === "watch") {
@@ -3451,7 +3497,8 @@
                 return;
               }
             }
-            const q = stretchOn || hasQ(si) ? null : hdlHit(hdlPts(cv, hw * 2, hh * 2), lx, ly);
+            const SB = itBox(si, assets[si.a]),
+              q = stretchOn || hasQ(si) ? null : hdlHit(hdlPts(cv, SB.hw * 2, SB.hh * 2), lx - SB.ox, ly - SB.oy);
             const KN = knobPt(si, assets[si.a], rotOff(cv));
             if (!q && Math.hypot(lx - KN.kx, ly - KN.ky) < hpx(cv) * 1.1) {
               rotIt = si;
@@ -3466,12 +3513,14 @@
                 cx: si.x,
                 cy: si.y,
                 th: t,
-                hw,
-                hh,
+                hw: SB.hw,
+                hh: SB.hh,
+                bx: SB.ox,
+                by: SB.oy,
                 sc: si.sc,
                 sx: si.sx || 1,
                 sy: si.sy || 1,
-                off: [lx - q.x, ly - q.y] /* where on the handle it was grabbed, so nothing jumps */,
+                off: [lx - SB.ox - q.x, ly - SB.oy - q.y] /* where on the handle it was grabbed, so nothing jumps */,
               };
             if (q) return;
           }
@@ -3543,19 +3592,21 @@
             clampK = (v, base) => Math.max(0.05, Math.min(20, base * v)) / base;
           let kx = 1,
             ky = 1;
+          const opx = (s.bx || 0) - s.hx * s.hw,
+            opy = (s.by || 0) - s.hy * s.hh; /* the opposite corner or side */
           if (s.hx && s.hy) {
-            const k = clampK(Math.hypot(px + s.hx * s.hw, py + s.hy * s.hh) / (2 * Math.hypot(s.hw, s.hh)), s.sc);
+            const k = clampK(Math.hypot(px - opx, py - opy) / (2 * Math.hypot(s.hw, s.hh)), s.sc);
             kx = ky = k;
             s.it.sc = s.sc * k;
           } else if (s.hx) {
-            kx = clampK((s.hx * px + s.hw) / (2 * s.hw), s.sx);
+            kx = clampK((s.hx * (px - opx)) / (2 * s.hw), s.sx);
             s.it.sx = s.sx * kx;
           } else {
-            ky = clampK((s.hy * py + s.hh) / (2 * s.hh), s.sy);
+            ky = clampK((s.hy * (py - opy)) / (2 * s.hh), s.sy);
             s.it.sy = s.sy * ky;
           }
-          const ax = -s.hx * s.hw * (1 - kx),
-            ay = -s.hy * s.hh * (1 - ky);
+          const ax = s.hx ? opx * (1 - kx) : 0,
+            ay = s.hy ? opy * (1 - ky) : 0;
           s.it.x = s.cx + ax * c - ay * n;
           s.it.y = s.cy + ax * n + ay * c;
           szUi(s.it);
