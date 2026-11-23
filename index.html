@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 5.95</div>
+      <div id="studiover">Version 5.96</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2968,7 +2968,7 @@
             f0.texts = m.texts;
           }
           try {
-            const fx = raw ? [] : FX.filter((f) => f.layer === L.id && i >= f.start && i <= f.end);
+            const fx = raw ? [] : FX.filter((f) => f.layer === L.id && fxOn(f, i));
             if (fx.length) layerFx(x, f0, fx, i);
             else drawFrame(x, f0, 1);
           } finally {
@@ -2979,7 +2979,7 @@
         if (on && i > 0) drawFrame(x, frames[i - 1], 0.3);
         x.restore();
         if (!raw) {
-          const gf = FX.filter((f) => f.layer === "all" && i >= f.start && i <= f.end);
+          const gf = FX.filter((f) => f.layer === "all" && fxOn(f, i));
           if (gf.length) applyFx(x, gf, i, false);
         }
       }
@@ -9101,9 +9101,18 @@
          thin round-ended streaks slanted about 9°, short and long drops) but not a copy of it. Every drop has its own
          place, length and speed, so it never repeats. Strength = how many drops. The first half second it starts
          light and gets heavier, like Joel's rain does. */
+      /* rain needs at most this many seconds for its last drops to reach the bottom after it stops */
+      const RAIN_TAIL = 1.2;
+      /* is this effect showing on frame i? Rain also shows just after its last frame, while the last drops fall */
+      function fxOn(f, i) {
+        if (i < f.start) return false;
+        if (i <= f.end) return true;
+        return f.t === "rain" && i <= f.end + Math.ceil(RAIN_TAIL * (+$("fps").value || 8));
+      }
       function rainDraw(x, e, i) {
         const fps = +$("fps").value || 8,
           t = Math.max(0, (i - e.start) / fps),
+          tEnd = (e.end + 1 - e.start) / fps; /* after this, no new drops start: the ones falling finish */
           n = Math.round(20 + (e.amt / 100) * 130),
           slant = Math.tan((9 * Math.PI) / 180),
           lw = Math.max(1.5, CH * 0.008);
@@ -9114,7 +9123,7 @@
         x.strokeStyle = "#009fff";
         x.lineCap = "round";
         x.lineWidth = lw;
-        x.globalAlpha = 0.9;
+        x.globalAlpha = Math.max(0.03, 1 - (e.see == null ? 35 : e.see) / 100); /* See-through slider */
         for (let k = 0; k < n; k++) {
           const x0 = rnd() * (CW + CH * slant),
             len = CH * (0.04 + rnd() * 0.18),
@@ -9123,7 +9132,11 @@
             bend = (rnd() - 0.5) * lw * 1.6,
             on = rnd() < live;
           if (!on) continue;
-          const y = ((ph + t * v) % (CH + len)) - len,
+          const per = CH + len,
+            cyc = Math.floor((ph + t * v) / per),
+            born = (cyc * per - ph) / v; /* when this drop started falling */
+          if (t > tEnd && born > tEnd) continue; /* the rain has stopped: no new drops */
+          const y = ((ph + t * v) % per) - len,
             xa = x0 - slant * y,
             xb = xa - slant * len;
           x.beginPath();
@@ -9378,7 +9391,22 @@
           en.value = e.end + 1;
           m.value = e.amt;
           c.value = e.col;
-          if (e.t === "rain") c.hidden = true; /* rain is drawn in Joel's own colours */
+          if (e.t === "rain") {
+            c.hidden = true; /* rain is drawn in Joel's blue */
+            const lab = document.createElement("label");
+            lab.className = "sl";
+            lab.innerHTML = 'See-through <b class="sv"></b><input type="range" min="0" max="95" class="see">';
+            c.after(lab);
+            const se = lab.querySelector(".see"),
+              sv = lab.querySelector(".sv");
+            se.value = e.see == null ? 35 : e.see;
+            sv.textContent = se.value + "%";
+            se.oninput = () => {
+              e.see = +se.value;
+              sv.textContent = se.value + "%";
+              dirty = true;
+            };
+          }
           s.oninput = () => {
             e.start = Math.max(0, (+s.value || 1) - 1);
           };
@@ -9469,6 +9497,7 @@
           col: t === "tint" ? "#ff4d4d" : t === "sunshine" ? "#ffd27a" : "#000000",
           layer: lv === "all" ? "all" : +lv,
           ...(t === "sunshine" ? { amt: 70, sx: 0.78, sy: 0.16, rays: 60, flare: true } : {}),
+          ...(t === "rain" ? { see: 35 } : {}),
         });
         fxUi();
         dirty = true;
