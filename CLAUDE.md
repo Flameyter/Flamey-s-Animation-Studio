@@ -7,6 +7,9 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - itch.io page: https://flameyter.itch.io/flameys-animation-studio (upload `itch/flamey-studio-itch.zip` once; it shows the website)
 - Joel's YouTube channel: **Flamey :)**, https://www.youtube.com/@CrazyPWAF (about 2.65K subscribers). Videos made in the studio go here.
 
+## Version
+- The version is shown at the bottom of the main menu (`#studiover`, "Version 5.9"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
+
 ## Checking your work
 - Syntax: pull the inline scripts out into one file and run `node --check` on it.
 - Behaviour: Playwright (chromium) against the file. Call `bkEval({t:'blockname', v:[...]})` directly. To draw a block: `bkBlockEl({t, v}, {palette:true})` into a div, then screenshot.
