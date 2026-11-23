@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 5.96</div>
+      <div id="studiover">Version 5.97</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -9114,7 +9114,7 @@
           t = Math.max(0, (i - e.start) / fps),
           tEnd = (e.end + 1 - e.start) / fps; /* after this, no new drops start: the ones falling finish */
           n = Math.round(20 + (e.amt / 100) * 130),
-          slant = Math.tan((9 * Math.PI) / 180),
+          slant = Math.tan(((e.ang == null ? 9 : e.ang) * Math.PI) / 180), /* Angle slider: 0 = straight down, + leans left, - leans right */
           lw = Math.max(1.5, CH * 0.008);
         let seed = ((e.start + 1) * 2654435761) >>> 0;
         const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0), seed / 4294967296);
@@ -9125,7 +9125,7 @@
         x.lineWidth = lw;
         x.globalAlpha = Math.max(0.03, 1 - (e.see == null ? 35 : e.see) / 100); /* See-through slider */
         for (let k = 0; k < n; k++) {
-          const x0 = rnd() * (CW + CH * slant),
+          const x0 = rnd() * (CW + CH * Math.abs(slant)) - (slant < 0 ? CH * Math.abs(slant) : 0), /* drops come in from the side the wind blows from */
             len = CH * (0.04 + rnd() * 0.18),
             v = CH * (1.1 + rnd() * 0.9),
             ph = rnd() * (CH + len),
@@ -9406,6 +9406,19 @@
               sv.textContent = se.value + "%";
               dirty = true;
             };
+            const lab2 = document.createElement("label");
+            lab2.className = "sl";
+            lab2.innerHTML = 'Angle <b class="av"></b><input type="range" min="-45" max="45" class="ang">';
+            lab.after(lab2);
+            const an = lab2.querySelector(".ang"),
+              av = lab2.querySelector(".av");
+            an.value = e.ang == null ? 9 : e.ang;
+            av.textContent = an.value + "°";
+            an.oninput = () => {
+              e.ang = +an.value;
+              av.textContent = an.value + "°";
+              dirty = true;
+            };
           }
           s.oninput = () => {
             e.start = Math.max(0, (+s.value || 1) - 1);
@@ -9497,7 +9510,7 @@
           col: t === "tint" ? "#ff4d4d" : t === "sunshine" ? "#ffd27a" : "#000000",
           layer: lv === "all" ? "all" : +lv,
           ...(t === "sunshine" ? { amt: 70, sx: 0.78, sy: 0.16, rays: 60, flare: true } : {}),
-          ...(t === "rain" ? { see: 35 } : {}),
+          ...(t === "rain" ? { see: 35, ang: 9 } : {}),
         });
         fxUi();
         dirty = true;
