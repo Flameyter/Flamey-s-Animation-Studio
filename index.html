@@ -14529,9 +14529,12 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       function rgBoneStart(rig, G, sx, sy) {
         const k = (rig.pose.view || rig.view) === "side" ? 0.12 : 1;
         let best = null, bd = 1e9;
+        /* the hidden starting bone of a blank character is never snapped to once real bones exist: its tip can sit
+           exactly on the bottom of your body line, and legs started there used to hang from it instead of the body */
+        const realB = rgBones(rig).some((q) => !q.art && q.id !== "torso");
         rgBones(rig).forEach((b) => {
           const g = G[b.id];
-          if (!g || b.art) return;
+          if (!g || b.art || (realB && rig.blank && b.id === "torso")) return;
           const de = Math.hypot(sx - g.ex, sy - g.ey);
           if (de < 16 && de < bd) ((bd = de), (best = { b, g, snap: true }));
         });
