@@ -20,10 +20,15 @@
   </head>
   <body>
     <iframe
-      src="https://flameyter.github.io/Flamey-s-Animation-Studio/"
+      id="studio"
+      src="about:blank"
       allow="fullscreen; microphone; clipboard-read; clipboard-write; autoplay"
       allowfullscreen
     ></iframe>
     <a href="https://flameyter.github.io/Flamey-s-Animation-Studio/" target="_blank" rel="noopener">↗ Open in new tab</a>
+    <script>
+      /* ask GitHub for a fresh copy every time, so itch.io always shows the newest studio (no old saved copy) */
+      document.getElementById("studio").src = "https://flameyter.github.io/Flamey-s-Animation-Studio/?fresh=" + Date.now();
+    </script>
   </body>
 </html>

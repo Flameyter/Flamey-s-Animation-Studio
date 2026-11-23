@@ -4,7 +4,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 
 ## Where the studio lives
 - Website (GitHub Pages, updates by itself from `main`): https://flameyter.github.io/Flamey-s-Animation-Studio/
-- itch.io page: https://flameyter.itch.io/flameys-animation-studio (upload `itch/flamey-studio-itch.zip` once; it shows the website)
+- itch.io page: https://flameyter.itch.io/flameys-animation-studio (upload `itch/flamey-studio-itch.zip` once; it shows the website, always a fresh copy via `?fresh=` so it matches GitHub right away)
 - Joel's YouTube channel: **Flamey :)**, https://www.youtube.com/@CrazyPWAF (about 2.65K subscribers). Videos made in the studio go here.
 
 ## Version
