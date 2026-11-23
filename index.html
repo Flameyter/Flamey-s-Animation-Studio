@@ -13373,7 +13373,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           if (pc) {
             const rx = ((q[0] - RG_CX) / RG_S) * (r1.flip ? -1 : 1) - (r1.pose.dx || 0), ry = (q[1] - RG_CY) / RG_S, bo = rgBoneOf(r1, pc);
             rgMove.moved = true;
-            rgPlace(r1, bo || pc, rgSkel(r1, r1.pose), rgMove.ox + rx - rgMove.sx, rgMove.oy + ry - rgMove.sy, rgMove.a);
+            rgPlace(r1, bo || pc, rgSkel(r1, r1.pose), rgMove.ox + rx - rgMove.sx, rgMove.oy + ry - rgMove.sy, rgMove.a - ((r1.pose.a && r1.pose.a[(bo || pc).id]) || 0));
             if (bo) rgSnapPt = rgSnapAt(r1, bo);
             else {
               const G2 = rgSkel(r1, r1.pose), g2 = G2[pc.id], d2 = rgDirV(g2.a), skip = new Set(rgBones(r1).some((q) => !q.art && q.id !== "torso") ? ["torso"] : []),
@@ -13416,13 +13416,22 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
             if (!bo && pc && rgMove.moved) {
               const G2 = rgSkel(r1, r1.pose), g2 = G2[pc.id], d2 = rgDirV(g2.a), skip = new Set(rgBones(r1).some((q) => !q.art && q.id !== "torso") ? ["torso"] : []),
                 nb = rgNearBone(r1, G2, g2.x + (d2[0] * pc.len) / 2, g2.y + (d2[1] * pc.len) / 2, skip);
-              if (nb && nb.id !== pc.p) rgPlace(r1, pc, G2, g2.x, g2.y, g2.a, nb.id);
-              rgm(nb && nb.id !== "torso" ? "Skin stuck to " + rgBoneName(r1, nb.id) + ". It moves with that bone." : "Draw some bones first (tap Bones): skin sticks to bones.");
+              /* let go near a bone: it sticks there (you can change it later). Let go away from bones: it stays on the
+                 bone it was on, just moved. It never jumps to a far-away bone. */
+              const near = nb && rgDistTo(r1, G2, g2.x + (d2[0] * pc.len) / 2, g2.y + (d2[1] * pc.len) / 2, skip) < SNAP;
+              if (near && nb.id !== pc.p) {
+                rgPlace(r1, pc, G2, g2.x, g2.y, g2.a - ((r1.pose.a && r1.pose.a[pc.id]) || 0), nb.id);
+                rgm("Skin stuck to " + rgBoneName(r1, nb.id) + ". Not right? Drag it again, or onto another bone.");
+              } else if (pc.p && pc.p !== "torso") rgm("Moved. It's still on " + rgBoneName(r1, pc.p) + ". Drag it onto another bone to stick it there.");
+              else rgm(nb ? "Skin stuck to " + rgBoneName(r1, nb.id) + ". It moves with that bone." : "Draw some bones first (tap Bones): skin sticks to bones.");
+              if (!near && (!pc.p || pc.p === "torso") && nb) rgPlace(r1, pc, G2, g2.x, g2.y, g2.a - ((r1.pose.a && r1.pose.a[pc.id]) || 0), nb.id);
             }
             if (bo && rgMove.moved) {
               const hit = rgSnapAt(r1, bo);
-              rgConnect(r1, bo);
-              rgm(hit ? "Joined to " + hit.name + ". Tap Bones and drag its dot to bend it." : "Not joined to anything. Drag it so one end touches another piece.");
+              if (hit) {
+                rgConnect(r1, bo);
+                rgm("Joined to " + hit.name + ". Not the right joint? Use 🔗 Connect or ✂ Disconnect.");
+              } else rgm("Moved. It's still joined where it was. Drag an end onto another bone to join it there.");
             }
             rgSnapPt = null;
             rgMove = null;
