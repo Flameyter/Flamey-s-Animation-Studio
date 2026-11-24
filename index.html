@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.01</div>
+      <div id="studiover">Version 6.02</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2134,6 +2134,7 @@
         </div>
         <div class="pn rgsh s-ed">
           <div class="ph">Character</div>
+          <div class="lbl">✏ While Editor is open, dragging a blue dot <b>moves that joint</b>: the bone gets longer, shorter or points somewhere new, and everything on it follows. Close Editor to bend bones again.</div>
           <div class="row"><input id="rgname" placeholder="Name" /><button id="rgdup">Copy</button><button id="rgdel">Delete</button></div>
           <div class="row"><label class="sl">Size<input type="range" id="rgsize" min="40" max="140" value="75" /></label><label class="sl" style="flex: 1 1 160px"><input type="checkbox" id="rgflip" style="width: auto" /> Face the other way</label></div>
         </div>
@@ -13015,6 +13016,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         rgCache = new Map();
       const rg = () => RIGS[ri];
       let rgSheetSet = () => {};
+      let rgMoved = false;
       /* ⚙ Settings → "Make selected bone non-draggable?": the picked bone can't be dragged or bent until it is turned off */
       function rgLockUi() {
         const b = document.getElementById("rglock"), m = document.getElementById("rglockmsg");
@@ -13821,6 +13823,23 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         if (rgDrag === "root") {
           pose.dx = Math.max(-60, Math.min(60, rx + (pose.dx || 0)));
           pose.dy = Math.max(-150, Math.min(70, ry));
+          return;
+        }
+        /* 🎛 Editor open: dragging a joint edits the bone itself. The end of a line goes where you drag it (longer,
+           shorter or pointing somewhere new) and everything hanging from it follows; a dot moves to where you drop it.
+           With Editor closed, dragging bends the bone as before. */
+        const eb = document.querySelector(".v-rigs").dataset.sh === "ed" && (rig.extra || []).find((q) => q.id === rgDrag && !q.art);
+        if (eb) {
+          const G = rgSkel(rig, pose),
+            g = G[eb.id],
+            pa = (pose.a && pose.a[eb.id]) || 0;
+          if (eb.shape === "dot" || !(eb.len > 0)) rgPlace(rig, eb, G, rx, ry, g.a - pa);
+          else {
+            const th = (Math.atan2(rx - g.x, -(ry - g.y)) * 180) / Math.PI;
+            eb.len = Math.max(8, Math.round(Math.hypot(rx - g.x, ry - g.y)));
+            eb.rel = Math.round(((((th - g.pa - pa + 180) % 360) + 360) % 360) - 180);
+          }
+          rgMoved = true;
           return;
         }
         const g = rgSkel(rig, pose)[rgDrag],
