@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.02</div>
+      <div id="studiover">Version 6.03</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1827,7 +1827,7 @@
               <li>An extension can make a <b>new slot</b> on the main menu (like <b>Export</b> or <b>Blocks</b>), or be an <b>add-on</b> that works inside the slots you already have (like <b>Upgrades</b>).</li>
               <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
-              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
+              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, and <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
             </ul>
           </details>
           <details>
@@ -9076,6 +9076,9 @@
           snow: "❄ Snow",
           lightning: "⚡ Lightning",
           fog: "🌫 Fog",
+          wind: "💨 Wind",
+          hail: "🧊 Hail",
+          rainbow: "🌈 Rainbow",
         };
       const ST = mk(),
         LT = mk();
@@ -9111,7 +9114,7 @@
       function fxOn(f, i) {
         if (i < f.start) return false;
         if (i <= f.end) return true;
-        const tail = f.t === "rain" ? RAIN_TAIL : f.t === "snow" ? SNOW_TAIL : f.t === "lightning" ? 0.4 : f.t === "fog" ? FOG_TAIL : 0;
+        const tail = { rain: RAIN_TAIL, snow: SNOW_TAIL, lightning: 0.4, fog: FOG_TAIL, wind: 1.5, hail: 1.2, rainbow: 2 }[f.t] || 0;
         return tail > 0 && i <= f.end + Math.ceil(tail * (+$("fps").value || 8));
       }
       /* ❄ Snow (Weather extension): drawn in code like the rain. Round white flakes of different sizes with a soft blue
@@ -9173,6 +9176,155 @@
           x.fill();
           x.restore();
         }
+        x.restore();
+      }
+      /* shared bits for the weather drawings */
+      const wxSeed = (n) => {
+        let q = n >>> 0;
+        return () => ((q = (q * 1664525 + 1013904223) >>> 0), q / 4294967296);
+      };
+      const wxT = (e, i) => {
+        const fps = +$("fps").value || 8;
+        return [Math.max(0, (i - e.start) / fps), (e.end + 1 - e.start) / fps];
+      };
+      const wxAlpha = (e, def) => Math.max(0.03, 1 - (e.see == null ? def : e.see) / 100);
+      /* 💨 Wind: white gust streaks sweep across with leaves and dust tumbling along. Strength = how strong (more and
+         faster), Angle = which way (0 or more blows right, less than 0 blows left; the bigger, the more it slopes),
+         colour box = the streaks' colour. When it ends, what is already blowing finishes crossing. */
+      function windDraw(x, e, i) {
+        const [t, tEnd] = wxT(e, i),
+          ang = e.ang == null ? 0 : e.ang,
+          dir = ang < 0 ? -1 : 1,
+          slope = Math.tan((Math.min(30, Math.abs(ang)) * Math.PI) / 180) * 0.6,
+          pow = 0.4 + (e.amt / 100) * 1.1,
+          col = /^#[0-9a-f]{6}$/i.test(e.col || "") && e.col !== "#000000" ? e.col : "#ffffff",
+          R = wxSeed((e.start + 5) * 2654435761);
+        x.save();
+        x.globalAlpha = wxAlpha(e, 25);
+        x.lineCap = "round";
+        const live = (born) => !(t > tEnd && born > tEnd);
+        /* gust streaks */
+        const ns = Math.round(6 + pow * 14);
+        for (let k = 0; k < ns; k++) {
+          const len = CW * (0.15 + R() * 0.3),
+            y0 = CH * (0.05 + R() * 0.9),
+            v = CW * (0.9 + R() * 0.8) * pow,
+            per = CW + len * 2,
+            ph = R() * per,
+            wav = CH * (0.01 + R() * 0.03),
+            w = Math.max(1, CH * (0.003 + R() * 0.004));
+          const pos = ph + t * v,
+            born = (Math.floor(pos / per) * per - ph) / v;
+          if (!live(born)) continue;
+          const head = (pos % per) - len,
+            xs = dir > 0 ? head : CW - head;
+          const g = x.createLinearGradient(xs, 0, xs - dir * len, 0);
+          g.addColorStop(0, fxMix(col, 0, 0.9));
+          g.addColorStop(1, fxMix(col, 0, 0));
+          x.strokeStyle = g;
+          x.lineWidth = w;
+          x.beginPath();
+          for (let j = 0; j <= 12; j++) {
+            const px = xs - dir * len * (j / 12),
+              py = y0 + slope * (dir > 0 ? px : CW - px) + Math.sin(j * 0.32 + t * 2 + k) * wav * 0.6; /* a gentle wave */
+            j ? x.lineTo(px, py) : x.moveTo(px, py);
+          }
+          x.stroke();
+        }
+        /* leaves and dust */
+        const nl = Math.round(4 + pow * 10),
+          LC = ["#4e9a3a", "#7cb342", "#b5772f", "#d9a441", "#8d6e63"];
+        for (let k = 0; k < nl; k++) {
+          const sz = CH * (0.012 + R() * 0.02),
+            y0 = CH * (0.1 + R() * 0.85),
+            v = CW * (0.6 + R() * 0.6) * pow,
+            per = CW + sz * 4,
+            ph = R() * per,
+            spin = 2 + R() * 5,
+            bob = CH * (0.02 + R() * 0.05),
+            c = LC[Math.floor(R() * LC.length)];
+          const pos = ph + t * v,
+            born = (Math.floor(pos / per) * per - ph) / v;
+          if (!live(born)) continue;
+          const px0 = (pos % per) - sz * 2,
+            px = dir > 0 ? px0 : CW - px0,
+            py = y0 + slope * px0 + Math.sin(t * 2.5 + k) * bob;
+          x.save();
+          x.translate(px, py);
+          x.rotate(t * spin + k);
+          x.fillStyle = c;
+          x.beginPath();
+          x.ellipse(0, 0, sz, sz * 0.45, 0, 0, 7);
+          x.fill();
+          x.restore();
+        }
+        x.restore();
+      }
+      /* 🧊 Hail: little ice pellets fall fast and bounce once when they hit the ground. Strength = how many,
+         See-through, Angle = slant. When it ends, the falling ones finish (and bounce). */
+      function hailDraw(x, e, i) {
+        const [t, tEnd] = wxT(e, i),
+          n = Math.round(15 + (e.amt / 100) * 110),
+          slant = Math.tan(((e.ang == null ? 5 : e.ang) * Math.PI) / 180),
+          R = wxSeed((e.start + 9) * 2246822519),
+          ground = CH * 0.985,
+          live = Math.min(1, 0.3 + t / 0.5);
+        x.save();
+        x.globalAlpha = wxAlpha(e, 10);
+        x.fillStyle = "#f4fbff";
+        x.strokeStyle = "rgba(120,170,215,0.9)";
+        x.lineWidth = Math.max(1, CH * 0.003);
+        for (let k = 0; k < n; k++) {
+          const r = CH * (0.005 + R() * 0.007),
+            v = CH * (1.8 + R() * 0.9),
+            hop = CH * (0.03 + R() * 0.04),
+            per = ground + r + hop * 1.6,
+            ph = R() * per,
+            x0 = R() * (CW + CH * Math.abs(slant)) - (slant < 0 ? CH * Math.abs(slant) : 0),
+            on = R() < live;
+          if (!on) continue;
+          const pos = ph + t * v,
+            born = (Math.floor(pos / per) * per - ph) / v;
+          if (t > tEnd && born > tEnd) continue;
+          const q = pos % per;
+          let px, py;
+          if (q < ground + r) {
+            py = q - r;
+            px = x0 - slant * py;
+          } else {
+            /* the bounce: up a little and sideways, then gone */
+            const u = (q - ground - r) / (hop * 1.6);
+            py = ground - r - Math.sin(u * Math.PI) * hop;
+            px = x0 - slant * ground + (k % 2 ? 1 : -1) * u * hop * 0.8;
+          }
+          x.beginPath();
+          x.arc(px, py, r, 0, 7);
+          x.fill();
+          x.stroke();
+        }
+        x.restore();
+      }
+      /* 🌈 Rainbow: a see-through arc of seven colours that fades in over 1.5 s and out after it ends.
+         Strength = how big, See-through (default 45%), Angle = where it stands, left to right. */
+      function rainbowDraw(x, e, i) {
+        const [t, tEnd] = wxT(e, i),
+          fade = Math.min(1, t / 1.5) * (t > tEnd ? Math.max(0, 1 - (t - tEnd) / 2) : 1);
+        if (fade <= 0) return;
+        const C = ["#ff3b30", "#ff9500", "#ffd60a", "#34c759", "#0a84ff", "#3f3fd8", "#a050e0"],
+          ang = e.ang == null ? 0 : e.ang,
+          cx = CW * (0.5 + (ang / 45) * 0.45),
+          R0 = Math.min(CW, CH * 1.8) * (0.3 + (e.amt / 100) * 0.45),
+          bw = R0 * 0.06,
+          cy = CH * 1.02;
+        x.save();
+        x.globalAlpha = wxAlpha(e, 45) * fade;
+        x.lineWidth = bw * 1.08;
+        C.forEach((c, k) => {
+          x.strokeStyle = c;
+          x.beginPath();
+          x.arc(cx, cy, R0 - k * bw, Math.PI, 0);
+          x.stroke();
+        });
         x.restore();
       }
       function lightDraw(x, e, i) {
@@ -9331,6 +9483,9 @@
           else if (t === "snow") snowDraw(x, e, i);
           else if (t === "lightning") lightDraw(x, e, i);
           else if (t === "fog") fogDraw(x, e, i);
+          else if (t === "wind") windDraw(x, e, i);
+          else if (t === "hail") hailDraw(x, e, i);
+          else if (t === "rainbow") rainbowDraw(x, e, i);
           else if (t === "blur") {
             x.clearRect(0, 0, CW, CH);
             blurOnto(x, ST, 2 + a * 14);
@@ -9567,11 +9722,12 @@
           en.value = e.end + 1;
           m.value = e.amt;
           c.value = e.col;
-          if (e.t === "rain" || e.t === "snow" || e.t === "lightning" || e.t === "fog") {
-            c.hidden = e.t !== "lightning" && e.t !== "fog"; /* rain and snow have their own colours */
-            if (e.t === "lightning" || e.t === "fog") {
-              c.title = e.t === "fog" ? "Fog colour" : "Lightning colour";
-              if (!/^#[0-9a-f]{6}$/i.test(e.col || "") || e.col === "#000000") c.value = e.col = e.t === "fog" ? "#e3e8ef" : "#6f5cff";
+          if (WX_KINDS.includes(e.t)) {
+            const defCol = { lightning: "#6f5cff", fog: "#e3e8ef", wind: "#ffffff" }[e.t];
+            c.hidden = !defCol; /* rain, snow, hail and rainbow have their own colours */
+            if (defCol) {
+              c.title = { lightning: "Lightning colour", fog: "Fog colour", wind: "Wind colour" }[e.t];
+              if (!/^#[0-9a-f]{6}$/i.test(e.col || "") || e.col === "#000000") c.value = e.col = defCol;
             }
             const lab = document.createElement("label");
             lab.className = "sl";
@@ -9579,7 +9735,7 @@
             c.after(lab);
             const se = lab.querySelector(".see"),
               sv = lab.querySelector(".sv");
-            se.value = e.see == null ? (e.t === "snow" ? 15 : e.t === "lightning" ? 0 : e.t === "fog" ? 20 : 35) : e.see;
+            se.value = e.see == null ? WX_DEF[e.t].see : e.see;
             sv.textContent = se.value + "%";
             se.oninput = () => {
               e.see = +se.value;
@@ -9592,7 +9748,7 @@
             lab.after(lab2);
             const an = lab2.querySelector(".ang"),
               av = lab2.querySelector(".av");
-            an.value = e.ang == null ? (e.t === "rain" ? 9 : 0) : e.ang;
+            an.value = e.ang == null ? WX_DEF[e.t].ang : e.ang;
             av.textContent = an.value + "°";
             an.oninput = () => {
               e.ang = +an.value;
@@ -9654,6 +9810,17 @@
           el.appendChild(d);
         });
       }
+      /* the weather kinds and how a new one starts */
+      const WX_KINDS = ["rain", "snow", "lightning", "fog", "wind", "hail", "rainbow"];
+      const WX_DEF = {
+        rain: { see: 35, ang: 9 },
+        snow: { see: 15, ang: 0, amt: 55 },
+        lightning: { see: 0, ang: 0, amt: 50, col: "#6f5cff" },
+        fog: { see: 20, ang: 0, amt: 55, col: "#e3e8ef" },
+        wind: { see: 25, ang: 0, amt: 55, col: "#ffffff" },
+        hail: { see: 10, ang: 5, amt: 50 },
+        rainbow: { see: 45, ang: 0, amt: 60 },
+      };
       function fxWeatherUi() {
         const sel = $("fxt");
         let gr = document.getElementById("fxweather");
@@ -9662,7 +9829,7 @@
           gr = document.createElement("optgroup");
           gr.id = "fxweather";
           gr.label = "Weather (extension)";
-          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option><option value="fog">🌫 Fog</option>';
+          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option><option value="fog">🌫 Fog</option><option value="wind">💨 Wind</option><option value="hail">🧊 Hail</option><option value="rainbow">🌈 Rainbow</option>';
           sel.appendChild(gr);
         } else if (!on && gr) {
           if (sel.value === "rain") sel.selectedIndex = 0;
@@ -9690,10 +9857,7 @@
           col: t === "tint" ? "#ff4d4d" : t === "sunshine" ? "#ffd27a" : "#000000",
           layer: lv === "all" ? "all" : +lv,
           ...(t === "sunshine" ? { amt: 70, sx: 0.78, sy: 0.16, rays: 60, flare: true } : {}),
-          ...(t === "rain" ? { see: 35, ang: 9 } : {}),
-          ...(t === "snow" ? { see: 15, ang: 0, amt: 55 } : {}),
-          ...(t === "lightning" ? { see: 0, ang: 0, amt: 50, col: "#6f5cff" } : {}),
-          ...(t === "fog" ? { see: 20, ang: 0, amt: 55, col: "#e3e8ef" } : {}),
+          ...(WX_DEF[t] || {}),
         });
         fxUi();
         dirty = true;
