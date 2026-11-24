@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 5.99</div>
+      <div id="studiover">Version 6.0</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1827,7 +1827,7 @@
               <li>An extension can make a <b>new slot</b> on the main menu (like <b>Export</b> or <b>Blocks</b>), or be an <b>add-on</b> that works inside the slots you already have (like <b>Upgrades</b>).</li>
               <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
-              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
+              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
             </ul>
           </details>
           <details>
@@ -9119,7 +9119,14 @@
       /* ⚡ Lightning (Weather extension): at random times a jagged bolt (sometimes with a branch) shoots down from the top
          and the whole picture flashes, flickers once and fades. Strength = how often, See-through = how bright,
          Angle = how the bolts lean. Every strike is different. */
+      /* a colour (#rrggbb) mixed with white: k = 0 is the colour, 1 is white. a = see-through for rgba */
+      const fxMix = (hex, k, a) => {
+        const n = parseInt(String(hex || "#6f5cff").replace("#", ""), 16) || 0x6f5cff,
+          m = (c) => Math.round(c + (255 - c) * k);
+        return "rgba(" + m((n >> 16) & 255) + "," + m((n >> 8) & 255) + "," + m(n & 255) + "," + (a == null ? 1 : a) + ")";
+      };
       function lightDraw(x, e, i) {
+        const col = /^#[0-9a-f]{6}$/i.test(e.col || "") && e.col !== "#000000" ? e.col : "#6f5cff"; /* the colour box */
         const fps = +$("fps").value || 8,
           t = Math.max(0, (i - e.start) / fps),
           tEnd = (e.end + 1 - e.start) / fps,
@@ -9142,7 +9149,7 @@
               B = mk((e.start + 1) * 977 + k * 7919);
             x.save();
             x.globalAlpha = 0.55 * f * bright;
-            x.fillStyle = "#eef4ff";
+            x.fillStyle = fxMix(col, 0.9); /* the flash, lightly tinted with the colour */
             x.fillRect(0, 0, CW, CH);
             /* the bolt */
             const pts = [],
@@ -9163,12 +9170,12 @@
             x.lineJoin = "round";
             x.lineCap = "round";
             /* a blue-purple glow and edge, so the bolt shows on a light sky as well as a dark one, and a white core */
-            x.shadowColor = "#6f5cff";
+            x.shadowColor = col;
             x.shadowBlur = CH * 0.05;
-            x.strokeStyle = "rgba(95,80,255,0.75)";
+            x.strokeStyle = fxMix(col, 0, 0.75);
             line(pts, Math.max(5, CH * 0.03));
             x.shadowBlur = 0;
-            x.strokeStyle = "#c9dcff";
+            x.strokeStyle = fxMix(col, 0.7);
             line(pts, Math.max(3, CH * 0.016));
             x.strokeStyle = "#ffffff";
             line(pts, Math.max(1.5, CH * 0.008));
@@ -9178,7 +9185,7 @@
                 br = [pts[s0]],
                 dir = B() < 0.5 ? -1 : 1;
               for (let j = 1; j <= 4; j++) br.push([br[j - 1][0] + dir * CW * (0.02 + B() * 0.03), br[j - 1][1] + CH * (0.04 + B() * 0.04)]);
-              x.strokeStyle = "rgba(95,80,255,0.7)";
+              x.strokeStyle = fxMix(col, 0, 0.7);
               line(br, Math.max(3, CH * 0.016));
               x.strokeStyle = "#ffffff";
               line(br, Math.max(1, CH * 0.005));
@@ -9510,7 +9517,11 @@
           m.value = e.amt;
           c.value = e.col;
           if (e.t === "rain" || e.t === "snow" || e.t === "lightning") {
-            c.hidden = true; /* rain is drawn in Joel's blue */
+            c.hidden = e.t !== "lightning"; /* rain and snow have their own colours; lightning's colour box changes its glow */
+            if (e.t === "lightning") {
+              c.title = "Lightning colour";
+              if (!/^#[0-9a-f]{6}$/i.test(e.col || "") || e.col === "#000000") c.value = e.col = "#6f5cff";
+            }
             const lab = document.createElement("label");
             lab.className = "sl";
             lab.innerHTML = 'See-through <b class="sv"></b><input type="range" min="0" max="95" class="see">';
@@ -9630,7 +9641,7 @@
           ...(t === "sunshine" ? { amt: 70, sx: 0.78, sy: 0.16, rays: 60, flare: true } : {}),
           ...(t === "rain" ? { see: 35, ang: 9 } : {}),
           ...(t === "snow" ? { see: 15, ang: 0, amt: 55 } : {}),
-          ...(t === "lightning" ? { see: 0, ang: 0, amt: 50 } : {}),
+          ...(t === "lightning" ? { see: 0, ang: 0, amt: 50, col: "#6f5cff" } : {}),
         });
         fxUi();
         dirty = true;
