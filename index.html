@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.0</div>
+      <div id="studiover">Version 6.01</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1827,7 +1827,7 @@
               <li>An extension can make a <b>new slot</b> on the main menu (like <b>Export</b> or <b>Blocks</b>), or be an <b>add-on</b> that works inside the slots you already have (like <b>Upgrades</b>).</li>
               <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
-              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
+              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
             </ul>
           </details>
           <details>
@@ -9074,6 +9074,7 @@
           rain: "🌧 Rain",
           snow: "❄ Snow",
           lightning: "⚡ Lightning",
+          fog: "🌫 Fog",
         };
       const ST = mk(),
         LT = mk();
@@ -9109,7 +9110,7 @@
       function fxOn(f, i) {
         if (i < f.start) return false;
         if (i <= f.end) return true;
-        const tail = f.t === "rain" ? RAIN_TAIL : f.t === "snow" ? SNOW_TAIL : f.t === "lightning" ? 0.4 : 0;
+        const tail = f.t === "rain" ? RAIN_TAIL : f.t === "snow" ? SNOW_TAIL : f.t === "lightning" ? 0.4 : f.t === "fog" ? FOG_TAIL : 0;
         return tail > 0 && i <= f.end + Math.ceil(tail * (+$("fps").value || 8));
       }
       /* ❄ Snow (Weather extension): drawn in code like the rain. Round white flakes of different sizes with a soft blue
@@ -9125,6 +9126,54 @@
           m = (c) => Math.round(c + (255 - c) * k);
         return "rgba(" + m((n >> 16) & 255) + "," + m((n >> 8) & 255) + "," + m(n & 255) + "," + (a == null ? 1 : a) + ")";
       };
+      /* 🌫 Fog (Weather extension): soft see-through clouds of mist drifting slowly, thicker near the ground, over a light
+         haze. It rolls in over about a second and lifts away over FOG_TAIL seconds after it ends. Strength = how thick,
+         See-through, Angle = which way and how fast it drifts, colour box = the fog's colour. */
+      const FOG_TAIL = 1.5;
+      function fogDraw(x, e, i) {
+        const fps = +$("fps").value || 8,
+          t = Math.max(0, (i - e.start) / fps),
+          tEnd = (e.end + 1 - e.start) / fps,
+          fade = Math.min(1, t / 1) * (t > tEnd ? Math.max(0, 1 - (t - tEnd) / FOG_TAIL) : 1),
+          dens = (0.35 + (e.amt / 100) * 0.9) * Math.max(0.03, 1 - (e.see == null ? 20 : e.see) / 100) * fade,
+          col = /^#[0-9a-f]{6}$/i.test(e.col || "") && e.col !== "#000000" ? e.col : "#e3e8ef",
+          ang = e.ang == null ? 0 : e.ang,
+          drift = ang === 0 ? 0.4 : ang / 15,
+          n = Math.round(8 + (e.amt / 100) * 10);
+        if (dens <= 0.001) return;
+        let seed = ((e.start + 3) * 3266489917) >>> 0;
+        const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0), seed / 4294967296);
+        x.save();
+        /* the haze: light at the top, thicker at the bottom */
+        const hz = x.createLinearGradient(0, 0, 0, CH);
+        hz.addColorStop(0, fxMix(col, 0, 0.1 * dens));
+        hz.addColorStop(1, fxMix(col, 0, 0.42 * dens));
+        x.fillStyle = hz;
+        x.fillRect(0, 0, CW, CH);
+        /* the drifting clouds of mist */
+        for (let k = 0; k < n; k++) {
+          const r = CH * (0.25 + rnd() * 0.3),
+            y = CH * (0.3 + Math.pow(rnd(), 0.6) * 0.75),
+            v = CW * (0.01 + rnd() * 0.02) * drift,
+            span = CW + 2 * r,
+            x0 = rnd() * span,
+            a = (0.22 + rnd() * 0.22) * dens,
+            sq = 0.45 + rnd() * 0.25; /* flatter than round */
+          const cx = ((((x0 + v * t) % span) + span) % span) - r;
+          x.save();
+          x.translate(cx, y);
+          x.scale(1, sq);
+          const g = x.createRadialGradient(0, 0, 0, 0, 0, r);
+          g.addColorStop(0, fxMix(col, 0, a));
+          g.addColorStop(1, fxMix(col, 0, 0));
+          x.fillStyle = g;
+          x.beginPath();
+          x.arc(0, 0, r, 0, 7);
+          x.fill();
+          x.restore();
+        }
+        x.restore();
+      }
       function lightDraw(x, e, i) {
         const col = /^#[0-9a-f]{6}$/i.test(e.col || "") && e.col !== "#000000" ? e.col : "#6f5cff"; /* the colour box */
         const fps = +$("fps").value || 8,
@@ -9280,6 +9329,7 @@
           if (t === "rain") rainDraw(x, e, i);
           else if (t === "snow") snowDraw(x, e, i);
           else if (t === "lightning") lightDraw(x, e, i);
+          else if (t === "fog") fogDraw(x, e, i);
           else if (t === "blur") {
             x.clearRect(0, 0, CW, CH);
             blurOnto(x, ST, 2 + a * 14);
@@ -9516,11 +9566,11 @@
           en.value = e.end + 1;
           m.value = e.amt;
           c.value = e.col;
-          if (e.t === "rain" || e.t === "snow" || e.t === "lightning") {
-            c.hidden = e.t !== "lightning"; /* rain and snow have their own colours; lightning's colour box changes its glow */
-            if (e.t === "lightning") {
-              c.title = "Lightning colour";
-              if (!/^#[0-9a-f]{6}$/i.test(e.col || "") || e.col === "#000000") c.value = e.col = "#6f5cff";
+          if (e.t === "rain" || e.t === "snow" || e.t === "lightning" || e.t === "fog") {
+            c.hidden = e.t !== "lightning" && e.t !== "fog"; /* rain and snow have their own colours */
+            if (e.t === "lightning" || e.t === "fog") {
+              c.title = e.t === "fog" ? "Fog colour" : "Lightning colour";
+              if (!/^#[0-9a-f]{6}$/i.test(e.col || "") || e.col === "#000000") c.value = e.col = e.t === "fog" ? "#e3e8ef" : "#6f5cff";
             }
             const lab = document.createElement("label");
             lab.className = "sl";
@@ -9528,7 +9578,7 @@
             c.after(lab);
             const se = lab.querySelector(".see"),
               sv = lab.querySelector(".sv");
-            se.value = e.see == null ? (e.t === "snow" ? 15 : e.t === "lightning" ? 0 : 35) : e.see;
+            se.value = e.see == null ? (e.t === "snow" ? 15 : e.t === "lightning" ? 0 : e.t === "fog" ? 20 : 35) : e.see;
             sv.textContent = se.value + "%";
             se.oninput = () => {
               e.see = +se.value;
@@ -9611,7 +9661,7 @@
           gr = document.createElement("optgroup");
           gr.id = "fxweather";
           gr.label = "Weather (extension)";
-          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option>';
+          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option><option value="fog">🌫 Fog</option>';
           sel.appendChild(gr);
         } else if (!on && gr) {
           if (sel.value === "rain") sel.selectedIndex = 0;
@@ -9642,6 +9692,7 @@
           ...(t === "rain" ? { see: 35, ang: 9 } : {}),
           ...(t === "snow" ? { see: 15, ang: 0, amt: 55 } : {}),
           ...(t === "lightning" ? { see: 0, ang: 0, amt: 50, col: "#6f5cff" } : {}),
+          ...(t === "fog" ? { see: 20, ang: 0, amt: 55, col: "#e3e8ef" } : {}),
         });
         fxUi();
         dirty = true;
