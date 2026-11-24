@@ -1111,7 +1111,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 5.98</div>
+      <div id="studiover">Version 5.99</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1827,7 +1827,7 @@
               <li>An extension can make a <b>new slot</b> on the main menu (like <b>Export</b> or <b>Blocks</b>), or be an <b>add-on</b> that works inside the slots you already have (like <b>Upgrades</b>).</li>
               <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
-              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, and <b>❄ Snow</b> makes snowflakes drift down. Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
+              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
             </ul>
           </details>
           <details>
@@ -9073,6 +9073,7 @@
           sunshine: "Sunshine",
           rain: "🌧 Rain",
           snow: "❄ Snow",
+          lightning: "⚡ Lightning",
         };
       const ST = mk(),
         LT = mk();
@@ -9108,13 +9109,85 @@
       function fxOn(f, i) {
         if (i < f.start) return false;
         if (i <= f.end) return true;
-        const tail = f.t === "rain" ? RAIN_TAIL : f.t === "snow" ? SNOW_TAIL : 0;
+        const tail = f.t === "rain" ? RAIN_TAIL : f.t === "snow" ? SNOW_TAIL : f.t === "lightning" ? 0.4 : 0;
         return tail > 0 && i <= f.end + Math.ceil(tail * (+$("fps").value || 8));
       }
       /* ❄ Snow (Weather extension): drawn in code like the rain. Round white flakes of different sizes with a soft blue
          edge (so they show on a light sky), falling slowly and swaying side to side. Strength = how many flakes,
          See-through, Angle = wind. When it ends, no new flakes start and the falling ones finish (up to SNOW_TAIL s). */
       const SNOW_TAIL = 8;
+      /* ⚡ Lightning (Weather extension): at random times a jagged bolt (sometimes with a branch) shoots down from the top
+         and the whole picture flashes, flickers once and fades. Strength = how often, See-through = how bright,
+         Angle = how the bolts lean. Every strike is different. */
+      function lightDraw(x, e, i) {
+        const fps = +$("fps").value || 8,
+          t = Math.max(0, (i - e.start) / fps),
+          tEnd = (e.end + 1 - e.start) / fps,
+          bright = Math.max(0.05, 1 - (e.see == null ? 0 : e.see) / 100),
+          lean = Math.tan(((e.ang == null ? 0 : e.ang) * Math.PI) / 180),
+          gapAvg = 3.2 - (e.amt / 100) * 2.6, /* seconds between strikes: 3.2 (rare) to 0.6 (storm) */
+          DUR = 0.45;
+        const mk = (sd) => {
+          let q = sd >>> 0;
+          return () => ((q = (q * 1664525 + 1013904223) >>> 0), q / 4294967296);
+        };
+        const R = mk((e.start + 11) * 2654435761);
+        let st = 0.15 + R() * 0.6;
+        for (let k = 0; k < 400 && st <= t; k++) {
+          const gap = gapAvg * (0.45 + R() * 1.1);
+          if (st <= tEnd && t >= st && t < st + DUR) {
+            const a = t - st,
+              /* flash: strong at once, a quick dip, a second flicker, then fade */
+              f = a < 0.08 ? 1 : a < 0.14 ? 0.25 : a < 0.22 ? 0.8 : Math.max(0, 1 - (a - 0.22) / (DUR - 0.22)) * 0.6,
+              B = mk((e.start + 1) * 977 + k * 7919);
+            x.save();
+            x.globalAlpha = 0.55 * f * bright;
+            x.fillStyle = "#eef4ff";
+            x.fillRect(0, 0, CW, CH);
+            /* the bolt */
+            const pts = [],
+              x0 = CW * (0.1 + B() * 0.8),
+              yEnd = CH * (0.55 + B() * 0.4),
+              steps = 9 + Math.floor(B() * 5);
+            for (let j = 0; j <= steps; j++) {
+              const y = (yEnd * j) / steps;
+              pts.push([x0 + lean * y + (j && j < steps ? (B() - 0.5) * CW * 0.06 : 0), y]);
+            }
+            const line = (P, w) => {
+              x.beginPath();
+              P.forEach((q, j) => (j ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])));
+              x.lineWidth = w;
+              x.stroke();
+            };
+            x.globalAlpha = Math.min(1, f * 1.2) * bright;
+            x.lineJoin = "round";
+            x.lineCap = "round";
+            /* a blue-purple glow and edge, so the bolt shows on a light sky as well as a dark one, and a white core */
+            x.shadowColor = "#6f5cff";
+            x.shadowBlur = CH * 0.05;
+            x.strokeStyle = "rgba(95,80,255,0.75)";
+            line(pts, Math.max(5, CH * 0.03));
+            x.shadowBlur = 0;
+            x.strokeStyle = "#c9dcff";
+            line(pts, Math.max(3, CH * 0.016));
+            x.strokeStyle = "#ffffff";
+            line(pts, Math.max(1.5, CH * 0.008));
+            if (B() < 0.6) {
+              /* a branch off the middle */
+              const s0 = 3 + Math.floor(B() * (steps - 5)),
+                br = [pts[s0]],
+                dir = B() < 0.5 ? -1 : 1;
+              for (let j = 1; j <= 4; j++) br.push([br[j - 1][0] + dir * CW * (0.02 + B() * 0.03), br[j - 1][1] + CH * (0.04 + B() * 0.04)]);
+              x.strokeStyle = "rgba(95,80,255,0.7)";
+              line(br, Math.max(3, CH * 0.016));
+              x.strokeStyle = "#ffffff";
+              line(br, Math.max(1, CH * 0.005));
+            }
+            x.restore();
+          }
+          st += gap;
+        }
+      }
       function snowDraw(x, e, i) {
         const fps = +$("fps").value || 8,
           t = Math.max(0, (i - e.start) / fps),
@@ -9199,6 +9272,7 @@
           s.drawImage(x.canvas, 0, 0);
           if (t === "rain") rainDraw(x, e, i);
           else if (t === "snow") snowDraw(x, e, i);
+          else if (t === "lightning") lightDraw(x, e, i);
           else if (t === "blur") {
             x.clearRect(0, 0, CW, CH);
             blurOnto(x, ST, 2 + a * 14);
@@ -9435,7 +9509,7 @@
           en.value = e.end + 1;
           m.value = e.amt;
           c.value = e.col;
-          if (e.t === "rain" || e.t === "snow") {
+          if (e.t === "rain" || e.t === "snow" || e.t === "lightning") {
             c.hidden = true; /* rain is drawn in Joel's blue */
             const lab = document.createElement("label");
             lab.className = "sl";
@@ -9443,7 +9517,7 @@
             c.after(lab);
             const se = lab.querySelector(".see"),
               sv = lab.querySelector(".sv");
-            se.value = e.see == null ? (e.t === "snow" ? 15 : 35) : e.see;
+            se.value = e.see == null ? (e.t === "snow" ? 15 : e.t === "lightning" ? 0 : 35) : e.see;
             sv.textContent = se.value + "%";
             se.oninput = () => {
               e.see = +se.value;
@@ -9456,7 +9530,7 @@
             lab.after(lab2);
             const an = lab2.querySelector(".ang"),
               av = lab2.querySelector(".av");
-            an.value = e.ang == null ? (e.t === "snow" ? 0 : 9) : e.ang;
+            an.value = e.ang == null ? (e.t === "rain" ? 9 : 0) : e.ang;
             av.textContent = an.value + "°";
             an.oninput = () => {
               e.ang = +an.value;
@@ -9526,7 +9600,7 @@
           gr = document.createElement("optgroup");
           gr.id = "fxweather";
           gr.label = "Weather (extension)";
-          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option>';
+          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option>';
           sel.appendChild(gr);
         } else if (!on && gr) {
           if (sel.value === "rain") sel.selectedIndex = 0;
@@ -9556,6 +9630,7 @@
           ...(t === "sunshine" ? { amt: 70, sx: 0.78, sy: 0.16, rays: 60, flare: true } : {}),
           ...(t === "rain" ? { see: 35, ang: 9 } : {}),
           ...(t === "snow" ? { see: 15, ang: 0, amt: 55 } : {}),
+          ...(t === "lightning" ? { see: 0, ang: 0, amt: 50 } : {}),
         });
         fxUi();
         dirty = true;
