@@ -337,7 +337,7 @@
         line-height: 1.5;
       }
       .cells {
-        display: block;
+        display: flex; /* Edit text and Edit camera: frames go across */
         overflow-x: auto;
         border: 1px solid var(--ln);
         border-radius: 6px;
@@ -380,6 +380,7 @@
         background: rgba(255, 102, 128, 0.35);
         box-shadow: inset 0 3px 0 var(--r);
       }
+      #cells { display: block; } /* only the Edit video timeline has rows (layers and sounds) */
       /* timeline rows: a name on the left that stays put while the frames scroll */
       .trow { display: flex; width: max-content; min-width: 100%; border-bottom: 1px solid var(--ln); }
       .trow:last-child { border-bottom: 0; }
@@ -1111,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.03</div>
+      <div id="studiover">Version 6.04</div>
     </div>
 
     <div id="bar" class="bar" hidden>
