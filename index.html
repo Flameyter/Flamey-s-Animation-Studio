@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.21</div>
+      <div id="studiover">Version 6.22</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5070,14 +5070,24 @@
         PTB = [];
       }
       /* one frame of falling: fall speed every frame, plus gravity that keeps adding up; it stops on the ground */
-      function ptStep() {
+      /* the ground is the bottom of what the camera shows on that frame (the whole picture when there is no camera) */
+      function ptGround(n) {
+        try {
+          const c = camGet(Math.max(0, (n || 1) - 1));
+          return c.y + c.h;
+        } catch (e) {
+          return CH;
+        }
+      }
+      function ptStep(n) {
+        const G = ptGround(n);
         for (const id in PTS) {
           const s = PTS[id],
             p = ptGet(id);
           if (!p || !s.shown || !s.falling) continue;
           s.y += ptN(p, "fall speed", 6) + s.vy;
           s.vy += ptN(p, "gravity", 1);
-          const floor = CH - Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100 * (s.k || 1);
+          const floor = G - Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100 * (s.k || 1);
           if (s.y >= floor) {
             s.y = floor;
             s.vy = 0;
@@ -5090,7 +5100,7 @@
           b.y += b.vy;
           b.vy += b.g;
           b.rot += b.vr;
-          const floor = CH - b.r;
+          const floor = G - b.r;
           if (b.y >= floor) {
             b.y = floor;
             b.vy = 0;
@@ -6066,7 +6076,7 @@
       async function bkPlayFrame(n) {
         if (!EXI.includes("blocks")) return;
         if (n === 1) ptReset(); /* particles start fresh at frame 1 */
-        else ptStep();
+        else ptStep(n);
         bkFlushWaits(); /* scripts that were waiting for the next frame carry on first */
         for (const S of BKS.slice()) {
           const h = S.b[0];
@@ -6119,7 +6129,7 @@
         if (!bkExp) return;
         bkExpN = n;
         if (n === 1) ptReset();
-        else ptStep();
+        else ptStep(n);
         bkFlushWaits(); /* scripts that were waiting for the next frame carry on first */
         await bkIdle();
         for (const S of BKS.slice()) {
