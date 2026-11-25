@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.17</div>
+      <div id="studiover">Version 6.18</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -4927,7 +4927,9 @@
         } catch (e) {}
       };
       const ptList = () => PT.map((p, k) => [p.id, "part " + (k + 1) + (/^p_/.test(p.id) ? "" : " (" + p.id + ")")]);
-      const ptGet = (id) => PT.find((p) => p.id === String(id)) || null;
+      let PT_CUR = ""; /* inside “only for all particles that have id”: the particle it is on right now */
+      const ptId = (id) => (id === "" || id == null ? PT_CUR : String(id));
+      const ptGet = (id) => PT.find((p) => p.id === ptId(id)) || null;
       const ptN = (p, k, d) => (p[k] === "" || p[k] == null || isNaN(+p[k]) ? d : +p[k]);
       const ptClamp = (v, a, b) => Math.max(a, Math.min(b, v));
       function ptHash(s) {
@@ -5015,6 +5017,11 @@
         let body = "";
         for (let s = ns - 1; s >= 0; s--)
           body += '<path d="' + d + '" fill="' + col + '" opacity="' + (op * (1 - (s / ns) * 0.7)).toFixed(3) + '" transform="translate(0 ' + (-s * gap).toFixed(2) + ") rotate(" + ptN(p, "angle", 0) + ')"/>';
+        if (p.inner) {
+          const q = p.inner,
+            qo = 1 - ptClamp(ptN(q, "transparency", 0), 0, 100) / 100;
+          body += '<path d="' + ptPath(q) + '" fill="' + ptColor(q) + '" opacity="' + qo.toFixed(3) + '" transform="scale(0.6) rotate(' + ptN(q, "angle", 0) + ')"/>';
+        }
         return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + Hh + '" viewBox="' + -W / 2 + " " + (-r - gap * (ns - 1)).toFixed(2) + " " + W + " " + Hh + '" data-pt="' + esc(JSON.stringify(p)) + '">' + body + "</svg>";
       }
       const ptShow = (p) => "data:image/svg+xml;utf8," + encodeURIComponent(ptSvg(p));
@@ -5123,6 +5130,7 @@
           x.fill(path);
           x.restore();
         }
+        if (p.inner) ptOne(x, p.inner, X, Y, k * 0.6, alpha, rot, seed == null ? null : seed + 1); /* cover: the inside particle, smaller, on top */
       }
       /* drawn on top of the frame (under the camera, like the rest of the picture); before each particle is drawn,
          what is under it is kept so “touching color” can look at it */
@@ -5175,7 +5183,7 @@
         for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 100 && Math.abs(d[k] - r) + Math.abs(d[k + 1] - g) + Math.abs(d[k + 2] - b) < 48) return true;
         return false;
       }
-      const ptState = (id) => PTS[String(id)] || null;
+      const ptState = (id) => PTS[ptId(id)] || null;
       const ptSetOpts = PT_KEYS.map((k) => [k, k]);
       const BKCAT = {
         watch: { n: "Watch video", c: "#59c059", i: "▶" },
@@ -5255,7 +5263,7 @@
         ptimpl: { cat: "particles", shape: "rep", tpl: "implement %1", a: [["str", ""]], run: (v) => ptRaw(v[0]) },
         ptmake: { cat: "particles", shape: "rep", tpl: "particle maker: id %1 color %2 brightness %3 saturation %4 size %5 poly sides %6 width %7 height %8 transparency %9 angle %10 strips %11 curve %12 warp %13 fall speed %14 gravity %15", a: [["str", ""], ["str", "2"], ["num", 0], ["num", 0], ["num", 10], ["num", 4], ["num", 90], ["num", 90], ["num", 0], ["num", 0], ["num", 1], ["num", ""], ["num", ""], ["num", ""], ["num", ""]], run: (v) => ptShow(ptSettings(v)) },
         ptspawn: { cat: "particles", shape: "cmd", tpl: "spawn at x: %1 y: %2", a: [["num", ""], ["num", ""]], run: (v) => {
-          const id = PT_LAST && ptGet(PT_LAST) ? PT_LAST : PT.length ? PT[PT.length - 1].id : "";
+          const id = PT_CUR && ptGet(PT_CUR) ? PT_CUR : PT_LAST && ptGet(PT_LAST) ? PT_LAST : PT.length ? PT[PT.length - 1].id : "";
           if (!id) return "no particle added yet";
           PTS[id] = { x: bkNum(v[0]), y: bkNum(v[1]), vy: 0, shown: true, falling: false };
           if (!playing && !bkExp && typeof ui === "function") ui();
@@ -5263,12 +5271,13 @@
         } },
         ptadd: { cat: "particles", shape: "cmd", tpl: "add particle %1", a: [["str", ""]], run: (v) => ptAdd(v[0]) },
         ptdel: { cat: "particles", shape: "cmd", tpl: "delete particle %1", a: [["menu", "", ptList, "no selected particle"]], run: (v) => {
-          const k = PT.findIndex((p) => p.id === String(v[0]));
+          const id = ptId(v[0]),
+            k = PT.findIndex((p) => p.id === id);
           if (k < 0) return "";
           PT.splice(k, 1);
-          delete PTS[String(v[0])];
-          PTB = PTB.filter((b) => b.id !== String(v[0]));
-          if (PT_LAST === String(v[0])) PT_LAST = PT.length ? PT[PT.length - 1].id : "";
+          delete PTS[id];
+          PTB = PTB.filter((b) => b.id !== id);
+          if (PT_LAST === id) PT_LAST = PT.length ? PT[PT.length - 1].id : "";
           ptSave();
           ptMenus();
           return "deleted";
@@ -5288,7 +5297,7 @@
           return "";
         } },
         ptboom: { cat: "particles", shape: "cmd", tpl: "explode %1 and make babies", a: [["menu", "", ptList, "no selected particle"]], run: (v) => {
-          ptExplode(String(v[0]));
+          ptExplode(ptId(v[0]));
           return "";
         } },
         ptfalling: { cat: "particles", shape: "bool", tpl: "%1 falling?", a: [["menu", "", ptList, "no particle"]], run: (v) => !!(ptState(v[0]) && ptState(v[0]).shown && ptState(v[0]).falling) },
@@ -5306,7 +5315,30 @@
           const o = PT_PRE[v[0]] || PT_PRE.blood;
           return ptShow(ptSettings(PT_KEYS.map((k) => (k === "id" ? (PT_PRE[v[0]] ? v[0] : "blood") : o[k] != null ? o[k] : k === "width" || k === "height" ? 100 : k === "strips" ? 1 : 0))));
         } },
-        pttouch: { cat: "particles", shape: "bool", tpl: "particle %1 touching color %2 ?", a: [["menu", "", ptList, "no particle"], ["col", "#ff0000"]], run: (v) => ptTouchCol(String(v[0]), v[1]) },
+        pttouch: { cat: "particles", shape: "bool", tpl: "particle %1 touching color %2 ?", a: [["menu", "", ptList, "no particle"], ["col", "#ff0000"]], run: (v) => ptTouchCol(ptId(v[0]), v[1]) },
+        ptcover: { cat: "particles", shape: "rep", tpl: "cover %1 in particle %2", a: [["menu", "", ptList, "no particle"], ["str", ""]], run: (v) => {
+          const inner = ptGet(v[0]),
+            shell = ptParse(v[1]);
+          if (!inner || !shell) return "";
+          const p = Object.assign({}, shell, { inner: Object.assign({}, inner) });
+          p.id = shell.id + " + " + inner.id;
+          return ptShow(p);
+        } },
+        ptonly: { cat: "particles", shape: "c", tpl: "only for all particles that have id %1", a: [["str", ""]], run: async (v, b) => {
+          const pre = String(v[0] == null ? "" : v[0]).trim().toLowerCase(),
+            ids = PT.filter((p) => p.id.toLowerCase().startsWith(pre)).map((p) => p.id),
+            was = PT_CUR;
+          try {
+            for (const id of ids) {
+              if (!ptGet(id)) continue;
+              PT_CUR = id;
+              if (await bkLoopBody(b)) break;
+            }
+          } finally {
+            PT_CUR = was;
+          }
+          return "";
+        } },
         xofchar: { cat: "rigs", shape: "rep", tpl: "x of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "x") },
         yofchar: { cat: "rigs", shape: "rep", tpl: "y of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "y") },
         /* ----- Audio blocks: play tracks from the Audio page. While playing they are heard; while exporting they go
