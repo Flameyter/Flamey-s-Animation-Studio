@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.19</div>
+      <div id="studiover">Version 6.20</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -4965,9 +4965,9 @@
           S = d === 0 ? 0 : (d / (1 - Math.abs(mx + mn - 1))) * 100;
           H = d === 0 ? 0 : mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
         } else {
-          H = ((((+c || 0) % 100) + 100) % 100) * 3.6;
-          S = 90;
-          L = 32;
+          H = ((((+c || 0) % 100) + 100) % 100) * 3.6; /* full colour: 0 is #ff0000 */
+          S = 100;
+          L = 50;
         }
         S = ptClamp(S + ptN(p, "saturation", 0), 0, 100);
         L = ptClamp(L + ptN(p, "brightness", 0) / 2, 0, 100);
