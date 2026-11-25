@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.20</div>
+      <div id="studiover">Version 6.21</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5062,7 +5062,10 @@
       function ptMenus() {
         if (typeof bkRender === "function" && !bkExp && document.querySelector(".bkpanel")) setTimeout(() => !bkExp && bkRender(), 0);
       }
+      let ptSpawnN = 0;
+      const ptBright = (p, db) => (db ? Object.assign({}, p, { brightness: ptN(p, "brightness", 0) + db }) : p);
       function ptReset() {
+        ptSpawnN = 0;
         PTS = {};
         PTB = [];
       }
@@ -5074,7 +5077,7 @@
           if (!p || !s.shown || !s.falling) continue;
           s.y += ptN(p, "fall speed", 6) + s.vy;
           s.vy += ptN(p, "gravity", 1);
-          const floor = CH - Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100;
+          const floor = CH - Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100 * (s.k || 1);
           if (s.y >= floor) {
             s.y = floor;
             s.vy = 0;
@@ -5110,7 +5113,7 @@
         for (let k = 0; k < n; k++) {
           const a = R() * Math.PI * 2,
             v = r * (0.6 + R() * 1.4) + 4;
-          PTB.push({ id, p, x: s.x, y: s.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - r * 0.6, g, k: 0.3 + R() * 0.25, r: r * 0.4, rot: R() * 360, vr: (R() * 2 - 1) * 25, life: 1, seed: ptHash(id) + k * 7919 });
+          PTB.push({ id, p, x: s.x, y: s.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - r * 0.6, g, k: (0.3 + R() * 0.25) * (p.vary ? 0.7 + R() * 0.6 : 1) * (s.k || 1), db: p.vary ? Math.round((R() * 2 - 1) * 25) : s.db || 0, r: r * 0.4, rot: R() * 360, vr: (R() * 2 - 1) * 25, life: 1, seed: ptHash(id) + k * 7919 });
         }
         s.shown = false;
         s.falling = false;
@@ -5166,9 +5169,9 @@
               s.under = null;
             }
           }
-          ptOne(x, p, s.x, s.y, 1, 1, 0);
+          ptOne(x, ptBright(p, s.db), s.x, s.y, s.k || 1, 1, 0);
         }
-        for (const b of PTB) ptOne(x, b.p, b.x, b.y, b.k, Math.max(0, Math.min(1, b.life)), b.rot, b.seed);
+        for (const b of PTB) ptOne(x, ptBright(b.p, b.db), b.x, b.y, b.k, Math.max(0, Math.min(1, b.life)), b.rot, b.seed);
         x.restore();
       }
       function ptTouchCol(id, col) {
@@ -5265,7 +5268,10 @@
         ptspawn: { cat: "particles", shape: "cmd", tpl: "spawn at x: %1 y: %2", a: [["num", ""], ["num", ""]], run: (v) => {
           const id = PT_CUR && ptGet(PT_CUR) ? PT_CUR : PT_LAST && ptGet(PT_LAST) ? PT_LAST : PT.length ? PT[PT.length - 1].id : "";
           if (!id) return "no particle added yet";
-          PTS[id] = { x: bkNum(v[0]), y: bkNum(v[1]), vy: 0, shown: true, falling: false };
+          const p = ptGet(id),
+            R = ptRng(ptHash(id + ":" + v[0] + ":" + v[1] + ":" + ++ptSpawnN));
+          /* presets come in different sizes and brightnesses every time they spawn */
+          PTS[id] = { x: bkNum(v[0]), y: bkNum(v[1]), vy: 0, shown: true, falling: false, k: p && p.vary ? 0.7 + R() * 0.6 : 1, db: p && p.vary ? Math.round((R() * 2 - 1) * 25) : 0 };
           if (!playing && !bkExp && typeof ui === "function") ui();
           return "";
         } },
@@ -5313,7 +5319,9 @@
         } },
         ptpreset: { cat: "particles", shape: "rep", tpl: "preset %1", a: [["menu", "blood", Object.keys(PT_PRE).map((k) => [k, k])]], run: (v) => {
           const o = PT_PRE[v[0]] || PT_PRE.blood;
-          return ptShow(ptSettings(PT_KEYS.map((k) => (k === "id" ? (PT_PRE[v[0]] ? v[0] : "blood") : o[k] != null ? o[k] : k === "width" || k === "height" ? 100 : k === "strips" ? 1 : 0))));
+          const p = ptSettings(PT_KEYS.map((k) => (k === "id" ? (PT_PRE[v[0]] ? v[0] : "blood") : o[k] != null ? o[k] : k === "width" || k === "height" ? 100 : k === "strips" ? 1 : 0)));
+          p.vary = 1; /* each one that spawns gets its own size and brightness */
+          return ptShow(p);
         } },
         pttouch: { cat: "particles", shape: "bool", tpl: "particle %1 touching color %2 ?", a: [["menu", "", ptList, "no particle"], ["col", "#ff0000"]], run: (v) => ptTouchCol(ptId(v[0]), v[1]) },
         ptcover: { cat: "particles", shape: "rep", tpl: "cover %1 in particle %2", a: [["menu", "", ptList, "no particle"], ["str", ""]], run: (v) => {
