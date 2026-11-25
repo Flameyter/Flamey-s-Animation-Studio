@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.18</div>
+      <div id="studiover">Version 6.19</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -6624,7 +6624,21 @@
         bkHideBubble();
         const bb = document.createElement("div");
         bb.className = "bkbubble";
-        bb.textContent = txt;
+        const pp = /^data:image\/svg\+xml/i.test(txt) ? ptParse(txt) : null;
+        if (pp) {
+          /* a particle: show it, made bigger so even a tiny one can be seen */
+          const im = new Image(),
+            m = /width="(\d+)" height="(\d+)"/.exec(ptRaw(txt)),
+            k = m ? Math.min(6, 110 / Math.max(+m[1], +m[2], 1)) : 3;
+          im.src = txt;
+          im.style.cssText = "display:block;margin:4px auto;background:repeating-conic-gradient(#e6e6e6 0 25%,#fff 0 50%) 0 0/12px 12px;border-radius:6px;padding:8px";
+          if (m) {
+            im.width = Math.round(+m[1] * k);
+            im.height = Math.round(+m[2] * k);
+          }
+          bb.append(im, document.createTextNode("particle: " + pp.id));
+          bb.style.textAlign = "center";
+        } else bb.textContent = txt;
         bb.style.left = Math.max(4, x) + "px";
         bb.style.top = y + "px";
         body.appendChild(bb);
