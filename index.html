@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.04</div>
+      <div id="studiover">Version 6.05</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1828,7 +1828,7 @@
               <li>An extension can make a <b>new slot</b> on the main menu (like <b>Export</b> or <b>Blocks</b>), or be an <b>add-on</b> that works inside the slots you already have (like <b>Upgrades</b>).</li>
               <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
-              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, and <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands). Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
+              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, and <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands). When 💨 Wind is on, rain, snow, hail and fog lean and drift with it. Combos add several at once that look good together: <b>⛈ Thunderstorm</b>, <b>🌨 Blizzard</b> and <b>🌦 After the storm</b>. Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
             </ul>
           </details>
           <details>
@@ -9143,7 +9143,7 @@
           dens = (0.35 + (e.amt / 100) * 0.9) * Math.max(0.03, 1 - (e.see == null ? 20 : e.see) / 100) * fade,
           col = /^#[0-9a-f]{6}$/i.test(e.col || "") && e.col !== "#000000" ? e.col : "#e3e8ef",
           ang = e.ang == null ? 0 : e.ang,
-          drift = ang === 0 ? 0.4 : ang / 15,
+          drift = (ang === 0 ? 0.4 : ang / 15) + wxWind(e, i).drift,
           n = Math.round(8 + (e.amt / 100) * 10);
         if (dens <= 0.001) return;
         let seed = ((e.start + 3) * 3266489917) >>> 0;
@@ -9189,6 +9189,17 @@
         return [Math.max(0, (i - e.start) / fps), (e.end + 1 - e.start) / fps];
       };
       const wxAlpha = (e, def) => Math.max(0.03, 1 - (e.see == null ? def : e.see) / 100);
+      /* weathers share the wind: if a 💨 Wind is on this frame (on the same layer, or either is on the whole picture),
+         rain, snow and hail lean with it and fog drifts with it. Gives how many degrees to add to the lean (rain,
+         snow and hail tip toward where the wind blows; a stronger wind tips them more) and how much to add to fog's drift. */
+      function wxWind(e, i) {
+        const w = FX.find((f) => f.t === "wind" && f !== e && fxOn(f, i) && (f.layer === e.layer || f.layer === "all" || e.layer === "all"));
+        if (!w) return { lean: 0, drift: 0 };
+        const dir = (w.ang == null ? 0 : w.ang) < 0 ? -1 : 1,
+          pow = 0.4 + (w.amt / 100) * 1.1;
+        return { lean: -dir * (10 + pow * 18), drift: dir * pow * 1.6 };
+      }
+      const wxAng = (e, i, def) => Math.max(-60, Math.min(60, (e.ang == null ? def : e.ang) + wxWind(e, i).lean));
       /* 💨 Wind: white gust streaks sweep across with leaves and dust tumbling along. Strength = how strong (more and
          faster), Angle = which way (0 or more blows right, less than 0 blows left; the bigger, the more it slopes),
          colour box = the streaks' colour. When it ends, what is already blowing finishes crossing. */
@@ -9266,7 +9277,7 @@
       function hailDraw(x, e, i) {
         const [t, tEnd] = wxT(e, i),
           n = Math.round(15 + (e.amt / 100) * 110),
-          slant = Math.tan(((e.ang == null ? 5 : e.ang) * Math.PI) / 180),
+          slant = Math.tan((wxAng(e, i, 5) * Math.PI) / 180),
           R = wxSeed((e.start + 9) * 2246822519),
           ground = CH * 0.985,
           live = Math.min(1, 0.3 + t / 0.5);
@@ -9403,7 +9414,7 @@
           t = Math.max(0, (i - e.start) / fps),
           tEnd = (e.end + 1 - e.start) / fps,
           n = Math.round(30 + (e.amt / 100) * 170),
-          wind = Math.tan(((e.ang == null ? 0 : e.ang) * Math.PI) / 180);
+          wind = Math.tan((wxAng(e, i, 0) * Math.PI) / 180);
         let seed = ((e.start + 7) * 2246822519) >>> 0;
         const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0), seed / 4294967296);
         const live = Math.min(1, 0.25 + t / 1.2);
@@ -9440,7 +9451,7 @@
           t = Math.max(0, (i - e.start) / fps),
           tEnd = (e.end + 1 - e.start) / fps; /* after this, no new drops start: the ones falling finish */
           n = Math.round(20 + (e.amt / 100) * 130),
-          slant = Math.tan(((e.ang == null ? 9 : e.ang) * Math.PI) / 180), /* Angle slider: 0 = straight down, + leans left, - leans right */
+          slant = Math.tan((wxAng(e, i, 9) * Math.PI) / 180), /* Angle slider (+ the wind): 0 = straight down, + leans left, - leans right */
           lw = Math.max(1.5, CH * 0.008);
         let seed = ((e.start + 1) * 2654435761) >>> 0;
         const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0), seed / 4294967296);
@@ -9830,7 +9841,7 @@
           gr = document.createElement("optgroup");
           gr.id = "fxweather";
           gr.label = "Weather (extension)";
-          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option><option value="fog">🌫 Fog</option><option value="wind">💨 Wind</option><option value="hail">🧊 Hail</option><option value="rainbow">🌈 Rainbow</option>';
+          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option><option value="fog">🌫 Fog</option><option value="wind">💨 Wind</option><option value="hail">🧊 Hail</option><option value="rainbow">🌈 Rainbow</option><option value="c:storm">⛈ Thunderstorm (combo)</option><option value="c:blizzard">🌨 Blizzard (combo)</option><option value="c:after">🌦 After the storm (combo)</option>';
           sel.appendChild(gr);
         } else if (!on && gr) {
           if (sel.value === "rain") sel.selectedIndex = 0;
@@ -9845,11 +9856,29 @@
           fxWeatherUi();
         };
       }
+      /* weather combos: several weathers at once, tuned to look good together. They are added as normal effects,
+         so each one can still be changed or deleted by itself. */
+      const WX_COMBO = {
+        storm: [["rain", { amt: 70, see: 40 }], ["lightning", { amt: 40, see: 15 }], ["wind", { amt: 45, see: 55, ang: 10 }]],
+        blizzard: [["snow", { amt: 85, see: 10 }], ["wind", { amt: 70, see: 45, ang: 10 }], ["fog", { amt: 35, see: 45 }]],
+        after: [["rain", { amt: 50, see: 45, part: [0, 0.6] }], ["rainbow", { amt: 55, see: 45, part: [0.5, 1] }]],
+      };
       $("fxadd").onclick = () => {
         const t = $("fxt").value,
           lv = $("fxl").value,
           s = Math.max(0, (+$("fxs").value || 1) - 1),
           e2 = Math.max(s, Math.min(frames.length - 1, (+$("fxe").value || 1) - 1));
+        if (t.startsWith("c:")) {
+          (WX_COMBO[t.slice(2)] || []).forEach(([k, o]) => {
+            const { part, ...set } = o,
+              a = part ? s + Math.round((e2 - s) * part[0]) : s,
+              b = part ? s + Math.round((e2 - s) * part[1]) : e2;
+            FX.push({ t: k, start: a, end: Math.max(a, b), amt: 60, col: "#000000", layer: lv === "all" ? "all" : +lv, ...(WX_DEF[k] || {}), ...set });
+          });
+          fxUi();
+          dirty = true;
+          return;
+        }
         FX.push({
           t,
           start: s,
