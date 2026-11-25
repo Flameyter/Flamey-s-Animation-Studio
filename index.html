@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.05</div>
+      <div id="studiover">Version 6.15</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2978,6 +2978,7 @@
             f0.texts = keepT;
           }
         });
+        if (!raw) ptDraw(x); /* Blocks: particles */
         if (on && i > 0) drawFrame(x, frames[i - 1], 0.3);
         x.restore();
         if (!raw) {
@@ -4887,6 +4888,278 @@
         }
         return 0;
       }
+      /* ── Particles (blocks). Particles are drawn in code, never made as assets, so the studio stays light.
+         A particle is its settings (PT_KEYS). “particle maker” and “preset” give it as displayable SVG (a data: link
+         with the settings inside), “implement” turns that into raw <svg> code, “add particle” saves it (PT, kept in
+         localStorage oss_particles) so it shows in the menus as part 1, part 2 … Where each one is on screen (PTS)
+         and the babies of an explosion (PTB) are not saved: they start fresh at frame 1 and when a video is exported.
+         x and y are canvas pixels from the top left, like “x of ()” in Rigs. */
+      const PT_KEYS = ["id", "color", "brightness", "saturation", "size", "poly sides", "width", "height", "transparency", "angle", "strips", "curve", "warp", "fall speed", "gravity"];
+      const PT_PRE = {
+        blood: { color: "#8a0303", size: 7, "poly sides": 0, width: 80, height: 120, curve: 60, warp: 25, strips: 1, "fall speed": 10, gravity: 2 },
+        gore: { color: "#5c0a0a", size: 13, "poly sides": 6, width: 110, height: 90, curve: 35, warp: 70, strips: 1, "fall speed": 12, gravity: 3 },
+        confetti: { color: "#ffcc00", size: 8, "poly sides": 4, width: 160, height: 70, angle: 30, strips: 1, "fall speed": 3, gravity: 0.3 },
+        "water drop": { color: "#3fa9ff", brightness: 10, transparency: 30, size: 7, "poly sides": 0, width: 80, height: 130, curve: 50, strips: 1, "fall speed": 10, gravity: 2 },
+        sparks: { color: "#ffc93c", brightness: 20, size: 5, "poly sides": 4, width: 35, height: 170, strips: 3, "fall speed": 6, gravity: 1 },
+        dust: { color: "#b9a78f", transparency: 55, size: 9, "poly sides": 0, warp: 45, strips: 1, "fall speed": 1, gravity: 0.1 },
+        rubble: { color: "#7a7166", size: 11, "poly sides": 5, warp: 55, curve: 15, strips: 1, "fall speed": 14, gravity: 4 },
+      };
+      let PT = [];
+      try {
+        PT = JSON.parse(localStorage.getItem("oss_particles") || "[]") || [];
+      } catch (e) {
+        PT = [];
+      }
+      let PTS = {},
+        PTB = [],
+        PT_LAST = PT.length ? PT[PT.length - 1].id : "",
+        PT_TOUCH = false; /* set once a “touching color” block runs, so the screen is only checked when it is needed */
+      const ptSave = () => {
+        try {
+          localStorage.setItem("oss_particles", JSON.stringify(PT));
+        } catch (e) {}
+      };
+      const ptList = () => PT.map((p, k) => [p.id, "part " + (k + 1) + (/^p_/.test(p.id) ? "" : " (" + p.id + ")")]);
+      const ptGet = (id) => PT.find((p) => p.id === String(id)) || null;
+      const ptN = (p, k, d) => (p[k] === "" || p[k] == null || isNaN(+p[k]) ? d : +p[k]);
+      const ptClamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      function ptHash(s) {
+        let q = 2166136261;
+        for (const ch of String(s)) q = Math.imul(q ^ ch.charCodeAt(0), 16777619) >>> 0;
+        return q;
+      }
+      function ptRng(seed) {
+        let q = seed >>> 0 || 1;
+        return () => ((q = (q * 1664525 + 1013904223) >>> 0), q / 4294967296);
+      }
+      function ptSettings(v) {
+        const p = {};
+        PT_KEYS.forEach((k, j) => (p[k] = v[j] == null ? "" : typeof v[j] === "object" ? "" : v[j]));
+        if (String(p.id).trim() === "") p.id = "p_" + ptHash(JSON.stringify(PT_KEYS.slice(1).map((k) => p[k]))).toString(36);
+        p.id = String(p.id).trim();
+        return p;
+      }
+      /* colour: a hex colour (#8a0303) or a number like Scratch's colour (0 to 100 goes round the rainbow: 2 is red);
+         brightness and saturation from -100 to 100 change it, 0 leaves it */
+      function ptColor(p) {
+        const c = String(p.color == null ? "" : p.color).trim();
+        let H, S, L;
+        if (/^#?[0-9a-f]{6}$/i.test(c)) {
+          const n = parseInt(c.replace("#", ""), 16),
+            r = (n >> 16) / 255,
+            g = ((n >> 8) & 255) / 255,
+            b = (n & 255) / 255,
+            mx = Math.max(r, g, b),
+            mn = Math.min(r, g, b),
+            d = mx - mn;
+          L = ((mx + mn) / 2) * 100;
+          S = d === 0 ? 0 : (d / (1 - Math.abs(mx + mn - 1))) * 100;
+          H = d === 0 ? 0 : mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+        } else {
+          H = ((((+c || 0) % 100) + 100) % 100) * 3.6;
+          S = 90;
+          L = 32;
+        }
+        S = ptClamp(S + ptN(p, "saturation", 0), 0, 100);
+        L = ptClamp(L + ptN(p, "brightness", 0) / 2, 0, 100);
+        return "hsl(" + ((H + 360) % 360).toFixed(1) + "," + S.toFixed(1) + "%," + L.toFixed(1) + "%)";
+      }
+      /* the shape around (0,0): poly sides (under 3 = round), size, width and height in %, curve rounds the corners,
+         warp makes it wobbly (the same wobble every time for the same particle) */
+      function ptPath(p, seed) {
+        const r = Math.max(1, ptN(p, "size", 10)),
+          n = Math.round(ptN(p, "poly sides", 4)),
+          sx = ptN(p, "width", 100) / 100,
+          sy = ptN(p, "height", 100) / 100,
+          warp = ptClamp(ptN(p, "warp", 0), 0, 100) / 100,
+          round = n < 3,
+          N = round ? 24 : Math.min(n, 40),
+          curve = round ? 0 : ptClamp(ptN(p, "curve", 0), 0, 100) / 200,
+          R = ptRng(seed == null ? ptHash(p.id) : seed),
+          pts = [];
+        for (let k = 0; k < N; k++) {
+          const a = -Math.PI / 2 + (k * 2 * Math.PI) / N,
+            rr = r * (1 + (R() * 2 - 1) * warp * 0.6);
+          pts.push([Math.cos(a) * rr * sx, Math.sin(a) * rr * sy]);
+        }
+        const f = (q) => q[0].toFixed(2) + " " + q[1].toFixed(2),
+          mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        if (curve <= 0) return "M" + pts.map(f).join(" L") + " Z";
+        let d = "";
+        pts.forEach((v, k) => {
+          const a = mix(v, pts[(k + N - 1) % N], curve),
+            b = mix(v, pts[(k + 1) % N], curve);
+          d += (k ? " L" : "M") + f(a) + " Q" + f(v) + " " + f(b);
+        });
+        return d + " Z";
+      }
+      const ptStrips = (p) => ptClamp(Math.round(ptN(p, "strips", 1)), 1, 12);
+      const ptGap = (p) => Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100 * 0.9;
+      function ptSvg(p) {
+        const r = Math.max(1, ptN(p, "size", 10)) * Math.max(1, ptN(p, "width", 100) / 100, ptN(p, "height", 100) / 100) * 1.7,
+          ns = ptStrips(p),
+          gap = ptGap(p),
+          W = Math.ceil(r * 2),
+          Hh = Math.ceil(r * 2 + gap * (ns - 1)),
+          d = ptPath(p),
+          col = ptColor(p),
+          op = 1 - ptClamp(ptN(p, "transparency", 0), 0, 100) / 100,
+          esc = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+        let body = "";
+        for (let s = ns - 1; s >= 0; s--)
+          body += '<path d="' + d + '" fill="' + col + '" opacity="' + (op * (1 - (s / ns) * 0.7)).toFixed(3) + '" transform="translate(0 ' + (-s * gap).toFixed(2) + ") rotate(" + ptN(p, "angle", 0) + ')"/>';
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + Hh + '" viewBox="' + -W / 2 + " " + (-r - gap * (ns - 1)).toFixed(2) + " " + W + " " + Hh + '" data-pt="' + esc(JSON.stringify(p)) + '">' + body + "</svg>";
+      }
+      const ptShow = (p) => "data:image/svg+xml;utf8," + encodeURIComponent(ptSvg(p));
+      function ptRaw(s) {
+        s = String(s == null ? "" : s).trim();
+        if (/^data:image\/svg\+xml/i.test(s)) {
+          const c = s.indexOf(",");
+          try {
+            s = /;base64/i.test(s.slice(0, c)) ? atob(s.slice(c + 1)) : decodeURIComponent(s.slice(c + 1));
+          } catch (e) {
+            return "";
+          }
+        }
+        return /^<svg[\s>]/i.test(s) ? s : "";
+      }
+      function ptParse(s) {
+        const m = /data-pt="([^"]*)"/.exec(ptRaw(s));
+        if (!m) return null;
+        try {
+          const o = JSON.parse(m[1].replace(/&lt;/g, "<").replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+          return o && o.id ? o : null;
+        } catch (e) {
+          return null;
+        }
+      }
+      function ptAdd(s) {
+        const p = ptParse(s);
+        if (!p) return "that is not a particle";
+        const k = PT.findIndex((q) => q.id === p.id);
+        if (k >= 0) PT[k] = p;
+        else PT.push(p);
+        PT_LAST = p.id;
+        ptSave();
+        ptMenus();
+        return "added part " + (PT.indexOf(ptGet(p.id)) + 1);
+      }
+      /* the particle menus in the Blocks editor follow the saved particles */
+      function ptMenus() {
+        if (typeof bkRender === "function" && !bkExp && document.querySelector(".bkpanel")) setTimeout(() => !bkExp && bkRender(), 0);
+      }
+      function ptReset() {
+        PTS = {};
+        PTB = [];
+      }
+      /* one frame of falling: fall speed every frame, plus gravity that keeps adding up; it stops on the ground */
+      function ptStep() {
+        for (const id in PTS) {
+          const s = PTS[id],
+            p = ptGet(id);
+          if (!p || !s.shown || !s.falling) continue;
+          s.y += ptN(p, "fall speed", 6) + s.vy;
+          s.vy += ptN(p, "gravity", 1);
+          const floor = CH - Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100;
+          if (s.y >= floor) {
+            s.y = floor;
+            s.vy = 0;
+            s.falling = false;
+          }
+        }
+        const fps = +$("fps").value || 8;
+        PTB = PTB.filter((b) => {
+          b.x += b.vx;
+          b.y += b.vy;
+          b.vy += b.g;
+          b.rot += b.vr;
+          const floor = CH - b.r;
+          if (b.y >= floor) {
+            b.y = floor;
+            b.vy = 0;
+            b.vx *= 0.5;
+            b.vr *= 0.5;
+            b.landed = true;
+          }
+          if (b.landed) b.life -= 1 / (fps * 1.2);
+          return b.life > 0 && b.x > -CW * 0.2 && b.x < CW * 1.2;
+        });
+      }
+      function ptExplode(id) {
+        const s = PTS[id],
+          p = ptGet(id);
+        if (!s || !p || !s.shown) return;
+        const r = Math.max(1, ptN(p, "size", 10)),
+          R = ptRng(ptHash(id + ":" + Math.round(s.x) + ":" + Math.round(s.y))),
+          n = 8 + Math.floor(R() * 7),
+          g = Math.max(0.6, ptN(p, "gravity", 1));
+        for (let k = 0; k < n; k++) {
+          const a = R() * Math.PI * 2,
+            v = r * (0.6 + R() * 1.4) + 4;
+          PTB.push({ id, p, x: s.x, y: s.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - r * 0.6, g, k: 0.3 + R() * 0.25, r: r * 0.4, rot: R() * 360, vr: (R() * 2 - 1) * 25, life: 1, seed: ptHash(id) + k * 7919 });
+        }
+        s.shown = false;
+        s.falling = false;
+      }
+      function ptOne(x, p, X, Y, k, alpha, rot, seed) {
+        const path = new Path2D(ptPath(p, seed)),
+          ns = ptStrips(p),
+          gap = ptGap(p) * k,
+          op = (1 - ptClamp(ptN(p, "transparency", 0), 0, 100) / 100) * alpha;
+        x.fillStyle = ptColor(p);
+        for (let s = ns - 1; s >= 0; s--) {
+          x.save();
+          x.translate(X, Y - s * gap);
+          x.rotate(((ptN(p, "angle", 0) + rot) * Math.PI) / 180);
+          x.scale(k, k);
+          x.globalAlpha = op * (1 - (s / ns) * 0.7);
+          x.fill(path);
+          x.restore();
+        }
+      }
+      /* drawn on top of the frame (under the camera, like the rest of the picture); before each particle is drawn,
+         what is under it is kept so “touching color” can look at it */
+      function ptDraw(x) {
+        if (!EXI.includes("blocks")) return;
+        const ids = Object.keys(PTS).filter((id) => PTS[id].shown && ptGet(id));
+        if (!ids.length && !PTB.length) return;
+        x.save();
+        for (const id of ids) {
+          const s = PTS[id],
+            p = ptGet(id);
+          if (PT_TOUCH) {
+            try {
+              const m = x.getTransform(),
+                c = m.transformPoint(new DOMPoint(s.x, s.y)),
+                rr = Math.max(2, Math.max(1, ptN(p, "size", 10)) * Math.max(ptN(p, "width", 100), ptN(p, "height", 100)) / 100 * Math.hypot(m.a, m.b)),
+                x0 = Math.max(0, Math.floor(c.x - rr)),
+                y0 = Math.max(0, Math.floor(c.y - rr)),
+                w = Math.min(x.canvas.width, Math.ceil(c.x + rr)) - x0,
+                h = Math.min(x.canvas.height, Math.ceil(c.y + rr)) - y0;
+              s.under = w > 0 && h > 0 ? x.getImageData(x0, y0, w, h).data : null;
+            } catch (e) {
+              s.under = null;
+            }
+          }
+          ptOne(x, p, s.x, s.y, 1, 1, 0);
+        }
+        for (const b of PTB) ptOne(x, b.p, b.x, b.y, b.k, Math.max(0, Math.min(1, b.life)), b.rot, b.seed);
+        x.restore();
+      }
+      function ptTouchCol(id, col) {
+        PT_TOUCH = true;
+        const s = PTS[id];
+        if (!s || !s.shown || !s.under) return false;
+        const n = parseInt(String(col || "#000000").replace("#", ""), 16),
+          r = n >> 16,
+          g = (n >> 8) & 255,
+          b = n & 255,
+          d = s.under;
+        for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 100 && Math.abs(d[k] - r) + Math.abs(d[k + 1] - g) + Math.abs(d[k + 2] - b) < 48) return true;
+        return false;
+      }
+      const ptState = (id) => PTS[String(id)] || null;
+      const ptSetOpts = PT_KEYS.map((k) => [k, k]);
       const BKCAT = {
         watch: { n: "Watch video", c: "#59c059", i: "▶" },
         settings: { n: "Settings", c: "#ff0000", i: "⚙" },
@@ -4898,6 +5171,7 @@
         rigs: { n: "Rigs", c: "#ff5a2a", i: "🦴" },
         audio: { n: "Audio", c: "#855cd6", i: "🎙" },
         looks: { n: "Looks", c: "#9966ff", i: "👁" },
+        particles: { n: "Particles", c: "#8a0303", i: "🩸" },
         edit: { n: "Edit video", c: "#4c97ff", i: "✎" },
         variables: { n: "Variables", c: "#ff8c1a", i: "📦" },
       };
@@ -4960,6 +5234,54 @@
         /* x of character / y of character: where a Rigs character stands (the same numbers the editor uses) on the frame being played.
            It only works under a frame hat (“when frame is”); anywhere else, including under “in editor”, it reports 0.
            A character that is not on that frame also reports 0. */
+        /* Particles (drawn in code; see ptSvg and ptDraw) */
+        ptimpl: { cat: "particles", shape: "rep", tpl: "implement %1", a: [["str", ""]], run: (v) => ptRaw(v[0]) },
+        ptmake: { cat: "particles", shape: "rep", tpl: "particle maker: id %1 color %2 brightness %3 saturation %4 size %5 poly sides %6 width %7 height %8 transparency %9 angle %10 strips %11 curve %12 warp %13 fall speed %14 gravity %15", a: [["str", ""], ["str", "2"], ["num", 0], ["num", 0], ["num", 10], ["num", 4], ["num", 90], ["num", 90], ["num", 0], ["num", 0], ["num", 1], ["num", ""], ["num", ""], ["num", ""], ["num", ""]], run: (v) => ptShow(ptSettings(v)) },
+        ptspawn: { cat: "particles", shape: "cmd", tpl: "spawn at x: %1 y: %2", a: [["num", ""], ["num", ""]], run: (v) => {
+          const id = PT_LAST && ptGet(PT_LAST) ? PT_LAST : PT.length ? PT[PT.length - 1].id : "";
+          if (!id) return "no particle added yet";
+          PTS[id] = { x: bkNum(v[0]), y: bkNum(v[1]), vy: 0, shown: true, falling: false };
+          if (!playing && !bkExp && typeof ui === "function") ui();
+          return "";
+        } },
+        ptadd: { cat: "particles", shape: "cmd", tpl: "add particle %1", a: [["str", ""]], run: (v) => ptAdd(v[0]) },
+        ptdel: { cat: "particles", shape: "cmd", tpl: "delete particle %1", a: [["menu", "", ptList, "no selected particle"]], run: (v) => {
+          const k = PT.findIndex((p) => p.id === String(v[0]));
+          if (k < 0) return "";
+          PT.splice(k, 1);
+          delete PTS[String(v[0])];
+          PTB = PTB.filter((b) => b.id !== String(v[0]));
+          if (PT_LAST === String(v[0])) PT_LAST = PT.length ? PT[PT.length - 1].id : "";
+          ptSave();
+          ptMenus();
+          return "deleted";
+        } },
+        pthitbox: { cat: "particles", shape: "bool", tpl: "touching hitbox %1", a: [["menu", "", () => [], "hitbox extension not available at this moment"]], run: () => false },
+        ptfall: { cat: "particles", shape: "cmd", tpl: "fall with particle %1 each frame with its fall speed", a: [["menu", "", ptList, "no selected particle"]], run: (v) => {
+          const s = ptState(v[0]);
+          if (s && s.shown) s.falling = true;
+          return "";
+        } },
+        ptboom: { cat: "particles", shape: "cmd", tpl: "explode %1 and make babies", a: [["menu", "", ptList, "no selected particle"]], run: (v) => {
+          ptExplode(String(v[0]));
+          return "";
+        } },
+        ptfalling: { cat: "particles", shape: "bool", tpl: "%1 falling?", a: [["menu", "", ptList, "no particle"]], run: (v) => !!(ptState(v[0]) && ptState(v[0]).shown && ptState(v[0]).falling) },
+        ptx: { cat: "particles", shape: "rep", tpl: "x of %1", a: [["menu", "", ptList, "no particle"]], run: (v) => (ptState(v[0]) ? Math.round(ptState(v[0]).x) : 0) },
+        pty: { cat: "particles", shape: "rep", tpl: "y of %1", a: [["menu", "", ptList, "no particle"]], run: (v) => (ptState(v[0]) ? Math.round(ptState(v[0]).y) : 0) },
+        ptset: { cat: "particles", shape: "rep", tpl: "%1 of %2", a: [["menu", "color", ptSetOpts], ["menu", "", ptList, "no particle"]], run: (v) => {
+          const p = ptGet(v[1]);
+          return p && p[v[0]] != null ? p[v[0]] : "";
+        } },
+        ptver: { cat: "particles", shape: "rep", tpl: "current version of %1", a: [["menu", "", ptList, "no particle"]], run: (v) => {
+          const p = ptGet(v[0]);
+          return p ? PT_KEYS.map((k) => k + ": " + (p[k] === "" || p[k] == null ? "(empty)" : p[k])).join(", ") : "";
+        } },
+        ptpreset: { cat: "particles", shape: "rep", tpl: "preset %1", a: [["menu", "blood", Object.keys(PT_PRE).map((k) => [k, k])]], run: (v) => {
+          const o = PT_PRE[v[0]] || PT_PRE.blood;
+          return ptShow(ptSettings(PT_KEYS.map((k) => (k === "id" ? (PT_PRE[v[0]] ? v[0] : "blood") : o[k] != null ? o[k] : k === "width" || k === "height" ? 100 : k === "strips" ? 1 : 0))));
+        } },
+        pttouch: { cat: "particles", shape: "bool", tpl: "particle %1 touching color %2 ?", a: [["menu", "", ptList, "no particle"], ["col", "#ff0000"]], run: (v) => ptTouchCol(String(v[0]), v[1]) },
         xofchar: { cat: "rigs", shape: "rep", tpl: "x of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "x") },
         yofchar: { cat: "rigs", shape: "rep", tpl: "y of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "y") },
         /* ----- Audio blocks: play tracks from the Audio page. While playing they are heard; while exporting they go
@@ -5623,7 +5945,7 @@
         for (const b of list) {
           if (bkShape(b) === "hat") continue;
           if (bkKill.has(b)) throw BK_KILL;
-          const tag = BLK[b.t].tpl.replace(/%\d/g, "…");
+          const tag = BLK[b.t].tpl.replace(/%\d+/g, "…");
           try {
             const r = await bkEval(b);
             if (!["c", "c2", "c3"].includes(bkShape(b))) bkAdd((bkIsRep(b) ? "= " : "✓ ") + tag + (r !== "" && r != null ? " · " + bkFmt(r).replace(/\n/g, ", ") : ""));
@@ -5678,6 +6000,8 @@
       }
       async function bkPlayFrame(n) {
         if (!EXI.includes("blocks")) return;
+        if (n === 1) ptReset(); /* particles start fresh at frame 1 */
+        else ptStep();
         bkFlushWaits(); /* scripts that were waiting for the next frame carry on first */
         for (const S of BKS.slice()) {
           const h = S.b[0];
@@ -5717,6 +6041,7 @@
       let bkExp = null;
       async function bkExportBegin() {
         bkExp = null;
+        ptReset();
         bkWas = new WeakMap();
         if (!EXI.includes("blocks") || !BKS.some((S) => bkFrameHat(S.b[0]))) return;
         try {
@@ -5728,6 +6053,8 @@
       async function bkExportFrame(n) {
         if (!bkExp) return;
         bkExpN = n;
+        if (n === 1) ptReset();
+        else ptStep();
         bkFlushWaits(); /* scripts that were waiting for the next frame carry on first */
         await bkIdle();
         for (const S of BKS.slice()) {
@@ -5763,6 +6090,7 @@
         const e = bkExp;
         bkCancelWaits(true);
         bkExp = null;
+        ptReset();
         if (!e) return;
         try {
           await bkLoadQuiet(JSON.parse(e.p));
@@ -5938,10 +6266,11 @@
           el.className = "bkmenu";
         } else {
           el = document.createElement("input");
-          el.type = def[0] === "num" ? "number" : "text";
+          el.type = def[0] === "num" ? "number" : def[0] === "col" ? "color" : "text";
           el.value = val;
           if (def[0] === "text") el.placeholder = "https://…";
-          el.style.width = def[0] === "num" ? "62px" : "120px";
+          el.style.width = def[0] === "num" ? "62px" : def[0] === "col" ? "34px" : "120px";
+          if (def[0] === "col") el.style.padding = "0";
         }
         el.onchange = el.oninput = () => {
           b.v[ai] = def[0] === "num" ? (el.value === "" ? "" : +el.value) : el.value;
@@ -5962,8 +6291,8 @@
         el.className = "bkblk s-" + d.shape + (d.shape === "c2" || d.shape === "c3" ? " s-c" : "") + (ctx.nested ? " nested" : "") + (ctx.palette ? " inpal" : "");
         el.style.setProperty("--bk", d.col || BKCAT[d.cat].c);
         if (isC) row.className = "bkctop";
-        d.tpl.split(/(%\d)/).forEach((part) => {
-          const m = /^%(\d)$/.exec(part);
+        d.tpl.split(/(%\d+)/).forEach((part) => {
+          const m = /^%(\d+)$/.exec(part);
           if (m) row.appendChild(bkSlotEl(b, +m[1] - 1, ctx));
           else if (part.trim()) {
             const s = document.createElement("span");
