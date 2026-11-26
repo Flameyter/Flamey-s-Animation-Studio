@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.40</div>
+      <div id="studiover">Version 6.41</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -4907,7 +4907,7 @@
          with the settings inside), “implement” turns that into raw <svg> code, “add particle” saves it (PT, kept in
          localStorage oss_particles) so it shows in the menus as part 1, part 2 … Where each one is on screen (PTS)
          and the babies of an explosion (PTB) are not saved: they start fresh at frame 1 and when a video is exported.
-         x and y are canvas pixels from the top left, like “x of ()” in Rigs. */
+         In the blocks 0,0 is the middle of the stage and y goes up; PTS keeps canvas pixels. */
       const PT_KEYS = ["id", "color", "brightness", "saturation", "size", "poly sides", "width", "height", "transparency", "angle", "strips", "curve", "warp", "fall speed", "gravity"];
       const PT_PRE = {
         blood: { color: "#8a0303", size: 7, "poly sides": 0, width: 80, height: 120, curve: 60, warp: 25, strips: 1, "fall speed": 10, gravity: 2 },
@@ -5270,13 +5270,15 @@
         return { pieces, ids, live: /~live/.test(String(s)) };
       }
       const hbText = (pieces, live) => pieces.map((q) => q.map((p) => Math.round(p[0] * 10) / 10 + "," + Math.round(p[1] * 10) / 10).join(" ")).join(" | ") + (live ? " ~live" : "");
-      const hbMid = () => [CW / 2, CH / 2];
+      /* block coordinates (like Scratch): 0,0 is the middle of the stage, x goes right, y goes up */
+      const hbMid = () => [0, 0];
+      const hbToStage = (q) => q.map((p) => [CW / 2 + p[0], CH / 2 - p[1]]);
       /* a regular polygon (n sides), w by h, around the middle of the stage */
       function hbReg(n, w, h, rot) {
         const [cx, cy] = hbMid(),
           q = [];
         for (let k = 0; k < n; k++) {
-          const a = (rot == null ? -Math.PI / 2 : rot) + (k * 2 * Math.PI) / n;
+          const a = (rot == null ? Math.PI / 2 : rot) + (k * 2 * Math.PI) / n; /* first point at the top (y goes up) */
           q.push([cx + (Math.cos(a) * w) / 2, cy + (Math.sin(a) * h) / 2]);
         }
         return q;
@@ -5387,11 +5389,12 @@
         });
       }
       /* the pieces of a hitbox as they are right now (a “spontaneously constantly” one keeps changing) */
+      /* the pieces of a hitbox as they are right now, on the stage (canvas pixels) */
       function hbNow(hb) {
         const P = hbParse(hb.pts);
-        if (!P.live) return P.pieces;
+        if (!P.live) return P.pieces.map(hbToStage);
         const t = (bkExp ? bkExpN : cur + 1) / (+$("fps").value || 8);
-        return P.pieces.map((q) => hbLiveWarp(q, t));
+        return P.pieces.map((q) => hbToStage(hbLiveWarp(q, t)));
       }
       function hbInside(q, x, y) {
         let c = false;
@@ -5473,7 +5476,7 @@
             if (!pi) {
               const top = q.reduce((a, p) => (p[1] < a[1] ? p : a), q[0]);
               x.fillStyle = col;
-              x.fillText(id, top[0] - x.measureText(id).width / 2, top[1] - 8);
+              x.fillText(id, top[0] - x.measureText(id).width / 2, Math.max(12, top[1] - 8)); /* stays inside the stage */
             }
           });
         }
@@ -5578,7 +5581,7 @@
           const p = ptGet(id),
             R = ptRng(ptHash(id + ":" + v[0] + ":" + v[1] + ":" + ++ptSpawnN));
           /* presets come in different sizes and brightnesses every time they spawn */
-          PTS[id] = { x: bkNum(v[0]), y: bkNum(v[1]), vy: 0, shown: true, falling: false, k: p && p.vary ? 0.7 + R() * 0.6 : 1, db: p && p.vary ? Math.round((R() * 2 - 1) * 25) : 0 };
+          PTS[id] = { x: CW / 2 + bkNum(v[0]), y: CH / 2 - bkNum(v[1]), /* 0,0 is the middle, y goes up */ vy: 0, shown: true, falling: false, k: p && p.vary ? 0.7 + R() * 0.6 : 1, db: p && p.vary ? Math.round((R() * 2 - 1) * 25) : 0 };
           if (!playing && !bkExp && typeof ui === "function") ui();
           return "";
         } },
@@ -5620,8 +5623,8 @@
           return "";
         } },
         ptfalling: { cat: "particles", shape: "bool", tpl: "%1 falling?", a: [["menu", "", ptList, "no particle"]], run: (v) => !!(ptState(v[0]) && ptState(v[0]).shown && ptState(v[0]).falling) },
-        ptx: { cat: "particles", shape: "rep", tpl: "x of %1", a: [["menu", "", ptList, "no particle"]], run: (v) => (ptState(v[0]) ? Math.round(ptState(v[0]).x) : 0) },
-        pty: { cat: "particles", shape: "rep", tpl: "y of %1", a: [["menu", "", ptList, "no particle"]], run: (v) => (ptState(v[0]) ? Math.round(ptState(v[0]).y) : 0) },
+        ptx: { cat: "particles", shape: "rep", tpl: "x of %1", a: [["menu", "", ptList, "no particle"]], run: (v) => (ptState(v[0]) ? Math.round(ptState(v[0]).x - CW / 2) : 0) },
+        pty: { cat: "particles", shape: "rep", tpl: "y of %1", a: [["menu", "", ptList, "no particle"]], run: (v) => (ptState(v[0]) ? Math.round(CH / 2 - ptState(v[0]).y) : 0) },
         ptset: { cat: "particles", shape: "rep", tpl: "%1 of %2", a: [["menu", "color", ptSetOpts], ["menu", "", ptList, "no particle"]], run: (v) => {
           const p = ptGet(v[1]);
           return p && p[v[0]] != null ? p[v[0]] : "";
