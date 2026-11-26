@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.88</div>
+      <div id="studiover">Version 6.89</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2237,6 +2237,8 @@
             <li><b>animation.gif</b> · the project as a gif</li>
             <li><b>assets/</b> · every asset as a picture (assets that came from an SVG stay SVG)</li>
             <li><b>sound/</b> · your sound files, only if there is sound</li>
+            <li><b>files/</b> · everything in 📁 Files, with the Files extension</li>
+            <li><b>blocks/</b> · your scripts as scratchblocks text (paste it into scratchblocks to see the blocks), the block code, and your particles and hitboxes, with the Blocks extension</li>
             <li><b>Flamey's Animation Studio.html</b> · a free copy of the studio (the newest one from the website) that works with no internet</li>
           </ul>
           <div class="row">
@@ -13541,6 +13543,64 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         }
         return L.join("\r\n") + "\r\n";
       }
+      /* blocks/scripts.txt: every script written as scratchblocks text, so it can be pasted into scratchblocks to see the
+         blocks (custom blocks get their category colour, hats get :: hat). */
+      function bkScratchText() {
+        const col = (d) => (d.col || (BKCAT[d.cat] && BKCAT[d.cat].c) || "#888").toLowerCase();
+        const val = (b, k) => {
+          const d = BLK[b.t],
+            def = d.a[k],
+            v = b.v[k];
+          if (v && typeof v === "object" && v.r) return inline(v.r);
+          if (def[0] === "bool") return "<>";
+          if (def[0] === "menu") {
+            let opts = [];
+            try {
+              opts = typeof def[2] === "function" ? def[2]() : def[2] || [];
+            } catch (e) {}
+            const o = opts.find((q) => String(q[0]) === String(v));
+            return "[" + String(o ? o[1] : v == null || v === "" ? (typeof def[3] === "function" ? def[3]() : def[3]) || " " : v).replace(/[\[\]]/g, "") + " v]";
+          }
+          if (def[0] === "num" && v !== "" && v != null && !isNaN(+v)) return "(" + v + ")";
+          if (def[0] === "col") return "[" + (v || "#000000") + "]";
+          return "[" + String(v == null ? "" : v).replace(/[\[\]\n]/g, " ") + "]";
+        };
+        const words = (b) => {
+          const d = BLK[b.t];
+          return d.tpl.split(/(%\d+)/).map((part) => (/^%\d+$/.test(part) ? val(b, +part.slice(1) - 1) : part)).join("").replace(/\s+/g, " ").trim();
+        };
+        const inline = (b) => {
+          const d = BLK[b.t];
+          if (!d) return "()";
+          const w = words(b) + " :: " + col(d);
+          return d.shape === "bool" ? "<" + w + ">" : "(" + w + (d.shape === "list" ? " :: list" : "") + ")";
+        };
+        const out = [];
+        const line = (b, ind) => {
+          const d = BLK[b.t];
+          if (!d) return;
+          const pad = "  ".repeat(ind),
+            kind = d.shape === "hat" ? " hat" : d.shape === "cap" ? " cap" : d.shape === "rep" || d.shape === "list" ? " reporter" : d.shape === "bool" ? " boolean" : "";
+          out.push(pad + words(b) + " ::" + kind + " " + col(d));
+          if (["c", "c2", "c3"].includes(d.shape)) {
+            (b.s || []).forEach((q) => line(q, ind + 1));
+            if (d.shape !== "c") {
+              out.push(pad + ((d.mids && d.mids[0]) || "else"));
+              (b.s2 || []).forEach((q) => line(q, ind + 1));
+            }
+            if (d.shape === "c3") {
+              out.push(pad + ((d.mids && d.mids[1]) || "else"));
+              (b.s3 || []).forEach((q) => line(q, ind + 1));
+            }
+            out.push(pad + (d.bot || "end"));
+          }
+        };
+        BKS.forEach((S, i) => {
+          if (i) out.push("");
+          S.b.forEach((b) => line(b, 0));
+        });
+        return out.join("\n") + "\n";
+      }
       $("zgo").onclick = async () => {
         const files = [],
           enc = new TextEncoder(),
@@ -13627,6 +13687,19 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           } catch (e) {
             extra.push("Gif: could not be made (" + ((e && e.message) || e) + ").");
           }
+          /* files/: everything in 📁 Files (with the Files extension) */
+          if (typeof flOn === "function" && flOn())
+            FILES.forEach((f) => {
+              const ext = (/(\.[^.]*)$/.exec(f.n) || [""])[0];
+              files.push({ name: uniq("files/", zsafe(f.n).replace(/(\.[^.]*)?$/, ""), ext), data: u8(f.u) });
+            });
+          /* blocks/: the scripts as scratchblocks text and as block code, plus particles and hitboxes */
+          if (EXI.includes("blocks") && BKS.length) {
+            files.push({ name: uniq("blocks/", "scripts", ".txt"), data: enc.encode(bkScratchText()) });
+            files.push({ name: uniq("blocks/", "blocks", ".json"), data: enc.encode(JSON.stringify({ scripts: BKS.map((S) => ({ x: S.x, y: S.y, b: S.b })), variables: typeof BKVAR !== "undefined" ? BKVAR : {} }, null, 2)) });
+          }
+          if (EXI.includes("blocks") && typeof ptOn === "function" && ptOn() && PT.length) files.push({ name: uniq("blocks/", "particles", ".json"), data: enc.encode(JSON.stringify(PT, null, 2)) });
+          if (EXI.includes("blocks") && typeof hbOn === "function" && hbOn() && Object.keys(HB).length) files.push({ name: uniq("blocks/", "hitboxes", ".json"), data: enc.encode(JSON.stringify(HB, null, 2)) });
           ZEXTRA.forEach((f) =>
             files.push({
               name: uniq("extra/", zsafe(f.name).replace(/(\.[^.]*)?$/, ""), (/(\.[^.]*)$/.exec(f.name) || [""])[0]),
