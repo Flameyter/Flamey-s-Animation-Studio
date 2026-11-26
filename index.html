@@ -381,6 +381,10 @@
         box-shadow: inset 0 3px 0 var(--r);
       }
       #cells { display: block; } /* only the Edit video timeline has rows (layers and sounds) */
+      #cells .cell { flex-basis: var(--tlw, 26px); } /* timeline zoom */
+      #cells.tlsmall .cell i { width: 5px; height: 5px; border-width: 1px; }
+      #cells.tltiny .cell i { width: 3px; height: 3px; border-radius: 0; }
+      #cells.tltiny .cell, #cells.tlsmall .cell { border-right-color: transparent; }
       /* timeline rows: a name on the left that stays put while the frames scroll */
       .trow { display: flex; width: max-content; min-width: 100%; border-bottom: 1px solid var(--ln); }
       .trow:last-child { border-bottom: 0; }
@@ -1112,7 +1116,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.17</div>
+      <div id="studiover">Version 7.27</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1226,7 +1230,8 @@
             ><button id="hbpshow" title="Show the hitbox point (drag it to read x and y)" hidden>⌖ Show point</button
             ><button id="hbphide" title="Hide the hitbox point" hidden>⌖ Hide point</button
             ><button id="twgo" title="Tween on: move an asset on a later frame and the frames in between fill in so it glides">Tween: Off</button
-            ><button id="twun" title="Undo the last tween">Undo tween</button>
+            ><button id="twun" title="Undo the last tween">Undo tween</button
+            ><button id="tlzo" title="Zoom the timeline out (see more frames)">🔍−</button><b id="tlzv" style="min-width: 40px; text-align: center">100%</b><button id="tlzi" title="Zoom the timeline in">🔍+</button>
           </div>
           <div id="twmsg" class="lbl"></div>
           <div class="cells" id="cells"></div>
@@ -1857,7 +1862,7 @@
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
               <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands), <b>🏜 Sandstorm</b> blows a sandy haze and grains across (Angle = which way, colour box = the sand), <b>🍂 Falling leaves</b> flutter down, and <b>🔥 Ash &amp; embers</b> sends glowing embers up while ash drifts down (colour box = the glow). When 💨 Wind is on, rain, snow, hail, leaves, embers and fog lean and drift with it, and a sandstorm blows harder. Combos add several at once that look good together: <b>⛈ Thunderstorm</b>, <b>🌨 Blizzard</b> and <b>🌦 After the storm</b>. Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
               <li><b>📳 Camera shake</b>: adds a Camera shake group to Effects: <b>💥 Hit shake</b> (a hard jolt that settles by the last frame), <b>🌋 Earthquake</b> and <b>🎥 Handheld</b> (a gentle drift). Strength = how hard.</li>
-              <li><b>🔊 Sound effects</b>: adds a Sound effects box to Audio. Tap <b>Whoosh, Punch, Explosion, Splash, Thunder, Rain, Pop, Footstep, Ding</b> or <b>Boing</b> to add it as a track at the frame you are on. They are made in code (no sound files), each tap sounds a little different, and they go into exported videos.</li>
+              <li><b>🔊 Sound effects</b>: adds a Sound effects box to Audio. Tap <b>Whoosh, Punch, Explosion, Splash, Thunder, Rain, Pop, Footstep, Ding, Boing, Sword clash, Glass break, Laser, Jump, Coin</b> or <b>Scream</b> to add it as a track at the frame you are on. They are made in code (no sound files), each tap sounds a little different, and they go into exported videos.</li>
               <li><b>📁 Files</b>: makes a Files slot. Upload files or get them from a link. Sounds show up on the Audio page (From Files) and in the sound blocks. Pictures can become an asset or a background, and show with the backgrounds in Scenery and Edit video. Text files are kept for blocks.</li>
               <li><b>🩸 Particles</b> (for Blocks): make particles in code (blood, gore, confetti, smoke, sparks, bubbles, tears and more, or your own), spawn them, make them fall, stop or explode.</li>
               <li><b>⬠ Hitbox</b> (for Blocks): invisible polygons made from points that particles can touch. They show in Edit video and Watch video, never in downloads. Drag the ⌖ point in Edit video to read x and y (0, 0 is the middle).</li>
@@ -3092,11 +3097,29 @@
       }
       /* the Edit video timeline, like a real studio: frame numbers on top, one row per layer (the top row is in front),
          then one row per sound track. Tap a cell to go to that frame on that layer; tap a sound to go to where it starts. */
-      const TLW = 26; /* width of one frame */
+      /* width of one frame in the Edit video timeline: the 🔍 buttons zoom it so long videos fit */
+      const TLZ = [3, 6, 13, 26, 40];
+      let TLW = 26;
+      try {
+        TLW = TLZ.includes(+localStorage.getItem("oss_tlw")) ? +localStorage.getItem("oss_tlw") : 26;
+      } catch (e) {}
+      function tlZoom(dir) {
+        const k = Math.max(0, Math.min(TLZ.length - 1, TLZ.indexOf(TLW) + dir));
+        TLW = TLZ[k];
+        try {
+          localStorage.setItem("oss_tlw", TLW);
+        } catch (e) {}
+        cells();
+      }
       function cells() {
         const el = $("cells"),
           keep = el.scrollLeft;
         el.innerHTML = "";
+        el.style.setProperty("--tlw", TLW + "px");
+        el.classList.toggle("tlsmall", TLW < 13 && TLW > 3);
+        el.classList.toggle("tltiny", TLW <= 3);
+        if ($("tlzv")) $("tlzv").textContent = Math.round((TLW / 26) * 100) + "%";
+        const every = TLW >= 26 ? 5 : TLW >= 13 ? 10 : TLW >= 6 ? 25 : 100; /* which frame numbers fit */
         const row = (label, cls, on) => {
           const r = document.createElement("div");
           r.className = "trow " + (cls || "");
@@ -3112,7 +3135,7 @@
         frames.forEach((f, i) => {
           const d = document.createElement("div");
           d.className = "cell" + (i === cur ? " cur" : "") + (f.tw ? " tw" : "");
-          d.innerHTML = "<span>" + ((i + 1) % 5 === 0 || i === 0 ? i + 1 : "") + "</span>";
+          d.innerHTML = "<span>" + ((i + 1) % every === 0 || i === 0 ? i + 1 : "") + "</span>";
           d.onclick = () => nav(i);
           nr.appendChild(d);
         });
@@ -3165,6 +3188,8 @@
         const x = 96 + cur * TLW;
         el.scrollLeft = x < keep + 96 || x > keep + el.clientWidth - TLW ? x - el.clientWidth / 2 : keep;
       }
+      $("tlzo").onclick = () => tlZoom(-1);
+      $("tlzi").onclick = () => tlZoom(1);
       function ui() {
         $("fl").textContent = $("wfl").textContent = $("fxfl").textContent = $("afl").textContent = cur + 1 + " / " + frames.length;
         $("play").textContent = $("fxplay").textContent = $("camplay").textContent = $("wflag").textContent = $("aplay").textContent = playing ? "❚❚" : "▶";
@@ -4039,7 +4064,7 @@
         {
           id: "sfx", types: ["addon"], icon: "🔊", name: "Sound effects", color: "#855cd6", target: "audio", cost: 0,
           origin: "Every sound is made in code: no sound files.",
-          instr: "Adds a Sound effects box to Audio: 💨 Whoosh, 👊 Punch, 💥 Explosion, 💦 Splash, ⚡ Thunder, 🌧 Rain, 🫧 Pop, 👣 Footstep, 🔔 Ding and 🌀 Boing. Tap one to add it as a track at the frame you are on; each tap sounds a little different. They play in Watch video and go into exported videos and zips.",
+          instr: "Adds a Sound effects box to Audio: 💨 Whoosh, 👊 Punch, 💥 Explosion, 💦 Splash, ⚡ Thunder, 🌧 Rain, 🫧 Pop, 👣 Footstep, 🔔 Ding, 🌀 Boing, ⚔ Sword clash, 🪟 Glass break, 🔫 Laser, 🦘 Jump, 🪙 Coin and 😱 Scream. Tap one to add it as a track at the frame you are on; each tap sounds a little different. They play in Watch video and go into exported videos and zips.",
           art: {},
         },
         {
@@ -10191,6 +10216,12 @@
         step: ["👣", "Footstep", 0.3],
         ding: ["🔔", "Ding", 1.4],
         boing: ["🌀", "Boing", 0.7],
+        sword: ["⚔", "Sword clash", 1],
+        glass: ["🪟", "Glass break", 1.3],
+        laser: ["🔫", "Laser", 0.5],
+        jump: ["🦘", "Jump", 0.35],
+        coin: ["🪙", "Coin", 0.55],
+        scream: ["😱", "Scream", 1.4],
       };
       function sfxNoise(c, sec, brown) {
         const b = c.createBuffer(1, Math.ceil(sec * c.sampleRate), c.sampleRate),
@@ -10278,6 +10309,46 @@
           tone("sine", f, [[0.005, 0.7], [sec, 0.0001]]);
           tone("sine", f * 2.01, [[0.005, 0.25], [sec * 0.6, 0.0001]]);
           tone("sine", f * 3.02, [[0.005, 0.1], [sec * 0.3, 0.0001]]);
+        } else if (kind === "sword") {
+          /* metal on metal: a clang of high, out-of-tune rings and a scrape */
+          noise(j(4500), 0.7, "highpass", [[0, 0.0001], [0.004, 1.2], [0.12, 0.0001]]);
+          [2370, 3710, 5180, 6930].forEach((f, k) => tone("sine", j(f, 0.03), [[0.003, 0.35 / (k + 1) + 0.1], [sec * (0.9 - k * 0.15), 0.0001]]));
+        } else if (kind === "glass") {
+          noise(j(3200), 0.6, "highpass", [[0, 0.0001], [0.005, 1.3], [0.35, 0.0001]]);
+          for (let q = 0; q < 26; q++) {
+            const t0 = R() * 0.7;
+            tone("sine", 3000 + R() * 5000, [[t0 + 0.003, 0.08 + R() * 0.18], [t0 + 0.05 + R() * 0.25, 0.0001]], null, t0);
+          }
+        } else if (kind === "laser") {
+          tone("sawtooth", j(1900), [[0.01, 0.5], [sec, 0.0001]], [[sec, j(180)]]);
+          tone("square", j(1700), [[0.01, 0.2], [sec * 0.8, 0.0001]], [[sec * 0.8, j(150)]]);
+        } else if (kind === "jump") {
+          tone("square", j(240), [[0.01, 0.75], [sec, 0.0001]], [[sec * 0.8, j(720)]]);
+        } else if (kind === "coin") {
+          const o = tone("square", 988, [[0.005, 0.65], [sec, 0.0001]]);
+          o.frequency.setValueAtTime(1319, 0.08);
+        } else if (kind === "scream") {
+          /* a wobbly high voice, shaped by a "mouth" filter */
+          const o = c.createOscillator(),
+            v = c.createOscillator(),
+            vg = c.createGain(),
+            fl = c.createBiquadFilter(),
+            g = c.createGain();
+          o.type = "sawtooth";
+          o.frequency.setValueAtTime(j(620), 0);
+          o.frequency.linearRampToValueAtTime(j(880), 0.25);
+          o.frequency.linearRampToValueAtTime(j(560), sec);
+          v.frequency.value = 6.5;
+          vg.gain.value = 35;
+          v.connect(vg).connect(o.frequency);
+          fl.type = "bandpass";
+          fl.frequency.value = j(1300);
+          fl.Q.value = 2.5;
+          env(g, [[0, 0.0001], [0.08, 1], [sec * 0.7, 0.75], [sec, 0.0001]]);
+          o.connect(fl).connect(g).connect(out);
+          o.start(0);
+          v.start(0);
+          noise(j(2500), 1, "bandpass", [[0, 0.0001], [0.08, 0.25], [sec, 0.0001]]);
         } else if (kind === "boing") {
           const o = tone("triangle", j(180), [[0.01, 0.8], [sec, 0.0001]]),
             lfo = c.createOscillator(),
