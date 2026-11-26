@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.36</div>
+      <div id="studiover">Version 6.37</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5231,6 +5231,17 @@
       let HBG = {},
         HB_LAST = "",
         HB_N = 0;
+      try {
+        HB_LAST = localStorage.getItem("oss_hb_last") || "";
+        HB_N = Object.keys(HB).reduce((m, k) => Math.max(m, +(/^hitbox (\d+)$/.exec(k) || [0, 0])[1]), 0);
+      } catch (e) {}
+      /* an empty id box means the last hitbox made */
+      const hbId = (v) => {
+        const s = String(v == null ? "" : v).trim();
+        return s || HB_LAST;
+      };
+      const HB_BLK = new WeakMap(); /* make-hitbox block → the hitbox it made */
+      const hbNone = (v) => "no hitbox called “" + String(v == null ? "" : v).trim() + "”. Hitboxes: " + (Object.keys(HB).join(", ") || "none yet");
       const hbOn = () => EXI.includes("blocks") && EXI.includes("hitbox");
       const hbSave = () => {
         try {
@@ -5253,7 +5264,9 @@
                   if (m[3]) ids.push(m[3]);
                   return [+m[1], +m[2]];
                 })
-                .filter(Boolean),
+                .filter(Boolean)
+                /* the same point twice only counts once (chained “with point” blocks repeat points) */
+                .filter((p, k, all) => all.findIndex((o) => o[0] === p[0] && o[1] === p[1]) === k),
             )
             .filter((q) => q.length);
         return { pieces, ids, live: /~live/.test(String(s)) };
@@ -5413,6 +5426,9 @@
         HB[id] = { pts, state, vis: HB[id] ? HB[id].vis : false };
         HB_LAST = id;
         hbSave();
+        try {
+          localStorage.setItem("oss_hb_last", id);
+        } catch (e) {}
         if (typeof ptMenus === "function") ptMenus();
         return id;
       }
@@ -5461,7 +5477,7 @@
         }
         x.restore();
       }
-      function hbSvg(hb) {
+      function hbSvg(hb, id) {
         const P = hbNow(hb),
           all = P.flat(),
           xs = all.map((p) => p[0]),
@@ -5471,7 +5487,7 @@
           W = Math.max(...xs) - x0 + 4,
           Hh = Math.max(...ys) - y0 + 4;
         return (
-          '<svg xmlns="http://www.w3.org/2000/svg" width="' + Math.ceil(W) + '" height="' + Math.ceil(Hh) + '" viewBox="' + x0 + " " + y0 + " " + W + " " + Hh + '">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="' + Math.ceil(W) + '" height="' + Math.ceil(Hh) + '" viewBox="' + x0 + " " + y0 + " " + W + " " + Hh + '" data-hitbox="' + String(id || "").replace(/[&"<]/g, "") + '">' +
           P.map((q) => '<polygon points="' + q.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ") + '" fill="#2fd36b" fill-opacity="0.25" stroke="#2fd36b" stroke-width="1.5" stroke-dasharray="5 4"/>').join("") +
           "</svg>"
         );
@@ -5643,22 +5659,30 @@
           return "";
         } },
         /* Hitbox (an extension for Blocks): see hbParse, hbMake, hbDraw */
-        hbmake: { cat: "hitbox", shape: "cmd", tpl: "make an hitbox, with points %1", a: [["str", ""]], run: (v) => {
+        hbmake: { cat: "hitbox", shape: "cmd", tpl: "make an hitbox, with points %1", a: [["str", ""]], run: (v, b) => {
           const P = hbParse(v[0]);
           if (!P.pieces.length) return "no points";
           /* the id the points carry the most */
           const cnt = {};
           P.ids.forEach((i) => (cnt[i] = (cnt[i] || 0) + 1));
-          const id = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || "";
-          return "made hitbox " + hbMake(id, String(v[0]).replace(/#[^\s|~]+/g, ""), "hitbox");
+          const txt = hbText(P.pieces, P.live);
+          /* no id on the points: the same block (or the same points) keeps its hitbox, so playing again does not pile up new ones */
+          const id =
+            Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x])[0] ||
+            (b && HB_BLK.get(b) && HB[HB_BLK.get(b)] ? HB_BLK.get(b) : "") ||
+            Object.keys(HB).find((k) => /^hitbox \d+$/.test(k) && HB[k].pts === txt) ||
+            "";
+          const made = hbMake(id, txt, "hitbox");
+          if (b) HB_BLK.set(b, made);
+          return "made hitbox " + made;
         } },
         hbpoint: { cat: "hitbox", shape: "rep", tpl: "make a point: x: %1 y: %2 and search for points to connect with, containing id %3", a: [["num", ""], ["num", ""], ["str", ""]], run: (v) => {
           const id = String(v[2] == null ? "" : v[2]).trim(),
             pt = Math.round(bkNum(v[0]) * 10) / 10 + "," + Math.round(bkNum(v[1]) * 10) / 10 + (id ? "#" + id : "");
-          if (id) (HBG[id] = HBG[id] || []).push(pt);
+          if (id && !(HBG[id] || []).includes(pt)) (HBG[id] = HBG[id] || []).push(pt);
           return id ? HBG[id].join(" ") : pt;
         } },
-        hbwith: { cat: "hitbox", shape: "rep", tpl: "%1 with point %2", a: [["str", ""], ["str", ""]], run: (v) => [v[0], v[1]].map((s) => String(s == null ? "" : s).trim()).filter(Boolean).join(" ") },
+        hbwith: { cat: "hitbox", shape: "rep", tpl: "%1 with point %2", a: [["str", ""], ["str", ""]], run: (v) => [...new Set([v[0], v[1]].map((s) => String(s == null ? "" : s).trim()).filter(Boolean).join(" ").split(/\s+/))].join(" ") },
         hbdeploy: { cat: "hitbox", shape: "cmd", tpl: "deploy polygon with id %1", a: [["str", ""]], run: (v) => {
           const id = String(v[0] == null ? "" : v[0]).trim();
           if (!id) return "no id";
@@ -5675,23 +5699,23 @@
           ptMenus();
           return HB_LAST + " is a hitbox";
         } },
-        hbget: { cat: "hitbox", shape: "rep", tpl: "hitbox with id %1", a: [["str", ""]], run: (v) => (HB[String(v[0]).trim()] ? HB[String(v[0]).trim()].pts : "") },
+        hbget: { cat: "hitbox", shape: "rep", tpl: "hitbox with id %1", a: [["str", ""]], run: (v) => (HB[hbId(v[0])] ? HB[hbId(v[0])].pts : hbNone(v[0])) },
         /* a reporter: gives an SVG picture of the hitbox (tap it to see it) */
         hbvis: { cat: "hitbox", shape: "rep", tpl: "visualize hitbox with id %1", a: [["str", ""]], run: (v) => {
-          const hb = HB[String(v[0]).trim()];
-          return hb ? "data:image/svg+xml;utf8," + encodeURIComponent(hbSvg(hb)) : "";
+          const hb = HB[hbId(v[0])];
+          return hb && hbParse(hb.pts).pieces.length ? "data:image/svg+xml;utf8," + encodeURIComponent(hbSvg(hb, hbId(v[0]))) : hbNone(v[0]);
         } },
         hbdel: { cat: "hitbox", shape: "cmd", tpl: "delete hitbox with id %1", a: [["str", ""]], run: (v) => {
-          const id = String(v[0]).trim();
-          if (!HB[id]) return "";
+          const id = hbId(v[0]);
+          if (!HB[id]) return hbNone(v[0]);
           delete HB[id];
           hbSave();
           ptMenus();
           return "deleted " + id;
         } },
         hbkeep: { cat: "hitbox", shape: "cmd", tpl: "save polygon with id %1 for later", a: [["str", ""]], run: (v) => {
-          const hb = HB[String(v[0]).trim()];
-          if (!hb) return "no polygon with that id";
+          const hb = HB[hbId(v[0])];
+          if (!hb) return hbNone(v[0]);
           hb.state = "saved";
           hbSave();
           ptMenus();
@@ -7062,7 +7086,8 @@
             im.width = Math.round(+m[1] * k);
             im.height = Math.round(+m[2] * k);
           }
-          bb.append(im, document.createTextNode(pp ? "particle: " + pp.id : "hitbox (" + (m ? m[1] + " × " + m[2] : "") + ")"));
+          const hid = /data-hitbox="([^"]*)"/.exec(ptRaw(txt));
+          bb.append(im, document.createTextNode(pp ? "particle: " + pp.id : "hitbox: " + (hid ? hid[1] : "") + (m ? " (" + m[1] + " × " + m[2] + ")" : "")));
           bb.style.textAlign = "center";
         } else bb.textContent = txt;
         bb.style.left = Math.max(4, x) + "px";
