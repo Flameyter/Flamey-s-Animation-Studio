@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.32</div>
+      <div id="studiover">Version 6.33</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5753,6 +5753,17 @@
             s = Math.min(CW, CH) * (0.2 + hbRnd() * 0.3),
             q = hbReg(n, s * (0.7 + hbRnd() * 0.6), s * (0.7 + hbRnd() * 0.6), hbRnd() * Math.PI);
           return hbText([hbRnd() < 0.5 ? hbFlaw(q, "warp", -s * 0.1, s * 0.1) : q]);
+        } },
+        hbat: { cat: "hitbox", shape: "rep", tpl: "%1 at x %2 and y %3", a: [["str", ""], ["num", ""], ["num", ""]], run: (v) => {
+          /* moves the polygon (all its pieces) so its middle is at x, y */
+          const P = hbParse(v[0]),
+            all = P.pieces.flat();
+          if (!all.length) return "";
+          const xs = all.map((q) => q[0]),
+            ys = all.map((q) => q[1]),
+            dx = bkNum(v[1]) - (Math.min(...xs) + Math.max(...xs)) / 2,
+            dy = bkNum(v[2]) - (Math.min(...ys) + Math.max(...ys)) / 2;
+          return hbText(P.pieces.map((q) => q.map((p) => [p[0] + dx, p[1] + dy])), P.live);
         } },
         xofchar: { cat: "rigs", shape: "rep", tpl: "x of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "x") },
         yofchar: { cat: "rigs", shape: "rep", tpl: "y of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "y") },
