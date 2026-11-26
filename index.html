@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.01</div>
+      <div id="studiover">Version 7.02</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -4523,6 +4523,7 @@
           a = fl ? { buf: fl.buf, vol: 1 } : /^\d+$/.test(String(x)) ? AUD[+x] : null;
         if (fl && !fl.buf) throw new Error("that file is still loading, or is not a sound the browser can play");
         if (!a || !a.buf) throw new Error(AUD.length ? "pick a sound" : "add a sound on the Audio page first");
+        if (bkExp && !bkSndOut) return ""; /* a video is being made without sound: never play it out loud */
         const out = bkExp ? bkSndOut : null, /* only while a video is being exported */
           live = out || playing,
           A = out ? out.A : actx(),
@@ -9685,7 +9686,8 @@
         await vecPrep();
         await bkExportBegin(); /* Blocks: keep a copy of the project; the scripts run frame by frame */
         try {
-          if (AUD.length) return await exportAV(kind);
+          /* sound: tracks on the Audio page, or sound blocks in a script (they can play sounds from Files too) */
+          if (AUD.length || (bkExp && EXI.includes("blocks") && /"t":"au(talk|bg|rep)"/.test(JSON.stringify(BKS)))) return await exportAV(kind);
           if (kind === "mp4" && window.VideoEncoder) {
             try {
               save(pfile(".mp4"), await exportMp4Codecs());
