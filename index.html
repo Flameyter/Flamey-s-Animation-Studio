@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.35</div>
+      <div id="studiover">Version 6.36</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5745,14 +5745,8 @@
             hi = Math.max(bkNum(v[2]), bkNum(v[3]));
           return hbText([hbFlaw(q, v[1] === "warping" ? "warp" : "curve", lo, hi)]);
         } },
-        hbaddfn: { cat: "hitbox", shape: "cmd", tpl: "add function %1", a: [["menu", "curve", [["curve", "curve"], ["warp", "warp"], ["round", "round"]]]], run: (v) => {
-          const hb = HB[HB_LAST];
-          if (!hb) return "deploy a polygon first";
-          const P = hbParse(hb.pts);
-          hb.pts = hbText(P.pieces.map((q) => hbFlaw(q, v[0])), P.live);
-          hbSave();
-          return "added " + v[0] + " to " + HB_LAST;
-        } },
+        /* a reporter: gives the function (flaw), to put into “() with function ()” */
+        hbaddfn: { cat: "hitbox", shape: "rep", tpl: "add function %1", a: [["menu", "curve", [["curve", "curve"], ["warp", "warp"], ["round", "round"]]]], run: (v) => v[0] || "curve" },
         hbrandom: { cat: "hitbox", shape: "rep", tpl: "get a random polygon", a: [], run: () => {
           const n = 3 + Math.floor(hbRnd() * 7),
             s = Math.min(CW, CH) * (0.2 + hbRnd() * 0.3),
