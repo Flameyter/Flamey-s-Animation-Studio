@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.58</div>
+      <div id="studiover">Version 6.68</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1520,6 +1520,12 @@
             Tip: wear headphones if you record while the animation plays, so the mic doesn’t pick up the speakers.
           </div>
         </div>
+        <div class="pn" id="sfxpn" hidden>
+          <div class="ph">Sound effects (extension)</div>
+          <div class="lbl">Made in code, no sound files. Tap one to add it as a track starting at this frame (drag it in the timeline to move it). Each tap makes a slightly different one.</div>
+          <div class="row" id="sfxrow"></div>
+          <div id="sfxmsg" class="lbl"></div>
+        </div>
         <div id="alist"></div>
       </div>
       <div class="v v-naming" hidden>
@@ -1831,6 +1837,10 @@
               <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
               <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands), <b>🏜 Sandstorm</b> blows a sandy haze and grains across (Angle = which way, colour box = the sand), <b>🍂 Falling leaves</b> flutter down, and <b>🔥 Ash &amp; embers</b> sends glowing embers up while ash drifts down (colour box = the glow). When 💨 Wind is on, rain, snow, hail, leaves, embers and fog lean and drift with it, and a sandstorm blows harder. Combos add several at once that look good together: <b>⛈ Thunderstorm</b>, <b>🌨 Blizzard</b> and <b>🌦 After the storm</b>. Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
+              <li><b>📳 Camera shake</b>: adds a Camera shake group to Effects: <b>💥 Hit shake</b> (a hard jolt that settles by the last frame), <b>🌋 Earthquake</b> and <b>🎥 Handheld</b> (a gentle drift). Strength = how hard.</li>
+              <li><b>🔊 Sound effects</b>: adds a Sound effects box to Audio. Tap <b>Whoosh, Punch, Explosion, Splash, Thunder, Rain, Pop, Footstep, Ding</b> or <b>Boing</b> to add it as a track at the frame you are on. They are made in code (no sound files), each tap sounds a little different, and they go into exported videos.</li>
+              <li><b>🩸 Particles</b> (for Blocks): make particles in code (blood, gore, confetti, smoke, sparks, bubbles, tears and more, or your own), spawn them, make them fall, stop or explode.</li>
+              <li><b>⬠ Hitbox</b> (for Blocks): invisible polygons made from points that particles can touch. They show in Edit video and Watch video, never in downloads. Drag the ⌖ point in Edit video to read x and y (0, 0 is the middle).</li>
             </ul>
           </details>
           <details>
@@ -3993,6 +4003,18 @@
           id: "weather", types: ["addon"], icon: "🌧", name: "Weather", color: "#3d8bff", target: "effects", cost: 0,
           origin: "Hand-drawn weather by Joel.",
           instr: "Adds a Weather group to Add an effect in Effects: 🌧 Rain, ❄ Snow, ⚡ Lightning, 🌫 Fog, 💨 Wind, 🧊 Hail, 🌈 Rainbow, 🏜 Sandstorm, 🍂 Falling leaves, 🔥 Ash & embers, and combos. They show in Watch video and in exports.",
+          art: {},
+        },
+        {
+          id: "sfx", types: ["addon"], icon: "🔊", name: "Sound effects", color: "#855cd6", target: "audio", cost: 0,
+          origin: "Every sound is made in code: no sound files.",
+          instr: "Adds a Sound effects box to Audio: 💨 Whoosh, 👊 Punch, 💥 Explosion, 💦 Splash, ⚡ Thunder, 🌧 Rain, 🫧 Pop, 👣 Footstep, 🔔 Ding and 🌀 Boing. Tap one to add it as a track at the frame you are on; each tap sounds a little different. They play in Watch video and go into exported videos and zips.",
+          art: {},
+        },
+        {
+          id: "shake", types: ["addon"], icon: "📳", name: "Camera shake", color: "#e8590c", target: "effects", cost: 0,
+          origin: "Made for hits, explosions and thunder.",
+          instr: "Adds a Camera shake group to Add an effect in Effects: 💥 Hit shake (a hard jolt that settles by the last frame), 🌋 Earthquake (strong rolling shaking) and 🎥 Handheld (a gentle drift). Strength = how hard. The picture zooms in a little so no empty edge shows. They show in Watch video and in exports.",
           art: {},
         },
         {
@@ -9306,11 +9328,26 @@
                 d.textContent = "Saved ✓";
               }
               (document.fullscreenElement || document.body).appendChild(d);
+              d.textContent = "Saved ✓";
+              d.style.background = "";
               d.classList.remove("on");
               void d.offsetWidth;
               d.classList.add("on");
             })
-            .catch(() => {});
+            .catch(() => {
+              /* the browser would not save it (full, or private mode): say so, so work is not lost without warning */
+              let d = document.getElementById("savedsign");
+              if (!d) {
+                d = document.createElement("div");
+                d.id = "savedsign";
+              }
+              d.textContent = "Not saved ✗ · use Export project or Zipper to keep your work";
+              d.style.background = "rgba(220,53,53,0.95)";
+              (document.fullscreenElement || document.body).appendChild(d);
+              d.classList.remove("on");
+              void d.offsetWidth;
+              d.classList.add("on");
+            });
         } catch (e) {}
       }
       ["pointerup", "input", "click"].forEach((v) =>
@@ -9741,6 +9778,145 @@
         audUi();
         dirty = true;
       }
+      /* ── Sound effects (extension for Audio): every sound is made in code with an OfflineAudioContext, then added
+         as a normal track (so it plays, moves in the timeline, and goes into exports and zips like any sound). */
+      const SFX = {
+        whoosh: ["💨", "Whoosh", 0.6],
+        punch: ["👊", "Punch", 0.4],
+        explosion: ["💥", "Explosion", 2.2],
+        splash: ["💦", "Splash", 0.9],
+        thunder: ["⚡", "Thunder", 3.2],
+        rain: ["🌧", "Rain", 5],
+        pop: ["🫧", "Pop", 0.2],
+        step: ["👣", "Footstep", 0.3],
+        ding: ["🔔", "Ding", 1.4],
+        boing: ["🌀", "Boing", 0.7],
+      };
+      function sfxNoise(c, sec, brown) {
+        const b = c.createBuffer(1, Math.ceil(sec * c.sampleRate), c.sampleRate),
+          d = b.getChannelData(0);
+        let last = 0;
+        for (let k = 0; k < d.length; k++) {
+          const w = Math.random() * 2 - 1;
+          if (brown) {
+            last = (last + 0.02 * w) / 1.02;
+            d[k] = last * 3.5;
+          } else d[k] = w;
+        }
+        const s = c.createBufferSource();
+        s.buffer = b;
+        return s;
+      }
+      async function sfxMake(kind) {
+        const sec = SFX[kind][2],
+          sr = 44100,
+          c = new OfflineAudioContext(1, Math.ceil(sec * sr), sr),
+          out = c.createGain(),
+          R = Math.random,
+          env = (g, pts) => {
+            g.gain.setValueAtTime(pts[0][1], 0);
+            pts.slice(1).forEach(([t, v]) => g.gain.exponentialRampToValueAtTime(Math.max(0.0001, v), t));
+          };
+        out.gain.value = 0.9;
+        out.connect(c.destination);
+        const noise = (f, q, type, pts, brown, freqPts) => {
+          const n = sfxNoise(c, sec, brown),
+            fl = c.createBiquadFilter(),
+            g = c.createGain();
+          fl.type = type;
+          fl.frequency.value = f;
+          fl.Q.value = q;
+          if (freqPts) freqPts.forEach(([t, v]) => fl.frequency.exponentialRampToValueAtTime(v, t));
+          env(g, pts);
+          n.connect(fl).connect(g).connect(out);
+          n.start(0);
+        };
+        const tone = (type, f0, pts, freqPts, start) => {
+          const o = c.createOscillator(),
+            g = c.createGain();
+          o.type = type;
+          o.frequency.setValueAtTime(f0, start || 0);
+          if (freqPts) freqPts.forEach(([t, v]) => o.frequency.exponentialRampToValueAtTime(v, t));
+          g.gain.setValueAtTime(0.0001, 0);
+          if (start) g.gain.setValueAtTime(0.0001, start);
+          pts.forEach(([t, v]) => g.gain.exponentialRampToValueAtTime(Math.max(0.0001, v), t));
+          o.connect(g).connect(out);
+          o.start(start || 0);
+          return o;
+        };
+        const j = (v, k) => v * (1 + (R() * 2 - 1) * (k || 0.15)); /* a little different every time */
+        if (kind === "whoosh") noise(j(400), 1.2, "bandpass", [[0, 0.0001], [0.25 * sec, 2.6], [sec, 0.0001]], false, [[0.3 * sec, j(2600)], [sec, j(500)]]);
+        else if (kind === "punch") {
+          tone("sine", j(160), [[0.005, 1], [0.25, 0.0001]], [[0.2, 45]]);
+          noise(j(1500), 0.8, "lowpass", [[0, 0.9], [0.08, 0.0001]]);
+        } else if (kind === "explosion") {
+          noise(1400, 0.7, "lowpass", [[0, 0.0001], [0.02, 1], [sec, 0.0001]], false, [[0.6, j(260)], [sec, 120]]);
+          tone("sine", j(70), [[0.02, 1], [1.5, 0.0001]], [[1.2, 28]]);
+          noise(600, 0.5, "lowpass", [[0, 0.0001], [0.05, 0.7], [sec, 0.0001]], true);
+        } else if (kind === "splash") {
+          noise(j(1200), 0.6, "highpass", [[0, 0.0001], [0.03, 0.8], [sec, 0.0001]]);
+          for (let q = 0; q < 6; q++) noise(j(2500, 0.4), 6, "bandpass", [[0, 0.0001], [0.05 + q * 0.09, 0.0001], [0.07 + q * 0.09, 0.6], [0.2 + q * 0.1, 0.0001]]);
+        } else if (kind === "thunder") {
+          noise(j(3500), 0.7, "highpass", [[0, 0.0001], [0.01, 0.9], [0.25, 0.0001]]);
+          noise(j(380), 0.6, "lowpass", [[0, 0.0001], [0.15, 1], [0.6, 0.5], [1.1, 0.8], [sec, 0.0001]], true);
+          tone("sine", j(55), [[0.2, 0.6], [sec, 0.0001]], [[sec, 30]]);
+        } else if (kind === "rain") {
+          noise(j(1400), 0.5, "highpass", [[0, 0.0001], [0.6, 0.35], [sec - 0.6, 0.35], [sec, 0.0001]]);
+          noise(j(4000), 0.4, "lowpass", [[0, 0.0001], [0.6, 0.18], [sec - 0.6, 0.18], [sec, 0.0001]], true);
+          for (let q = 0; q < 40; q++) {
+            const t0 = 0.2 + R() * (sec - 0.5);
+            tone("sine", 1800 + R() * 2600, [[t0 + 0.004, 0.12 + R() * 0.12], [t0 + 0.03, 0.0001]], null, t0);
+          }
+        } else if (kind === "pop") {
+          tone("sine", j(520), [[0.005, 0.9], [0.12, 0.0001]], [[0.06, j(1400)]]);
+          noise(3000, 1, "highpass", [[0, 0.5], [0.02, 0.0001]]);
+        } else if (kind === "step") {
+          noise(j(500), 1, "lowpass", [[0, 0.0001], [0.01, 3], [0.15, 0.0001]]);
+          noise(j(2500), 1, "bandpass", [[0, 0.0001], [0.005, 1.2], [0.04, 0.0001]]);
+        } else if (kind === "ding") {
+          const f = j(1320, 0.05);
+          tone("sine", f, [[0.005, 0.7], [sec, 0.0001]]);
+          tone("sine", f * 2.01, [[0.005, 0.25], [sec * 0.6, 0.0001]]);
+          tone("sine", f * 3.02, [[0.005, 0.1], [sec * 0.3, 0.0001]]);
+        } else if (kind === "boing") {
+          const o = tone("triangle", j(180), [[0.01, 0.8], [sec, 0.0001]]),
+            lfo = c.createOscillator(),
+            lg = c.createGain();
+          o.frequency.linearRampToValueAtTime(j(420), sec);
+          lfo.frequency.setValueAtTime(18, 0);
+          lfo.frequency.linearRampToValueAtTime(6, sec);
+          lg.gain.value = 60;
+          lfo.connect(lg).connect(o.frequency);
+          lfo.start(0);
+        }
+        return c.startRendering();
+      }
+      async function sfxAdd(kind) {
+        try {
+          $("sfxmsg").textContent = "Making " + SFX[kind][1].toLowerCase() + "…";
+          const made = await sfxMake(kind),
+            n = SFX[kind][0] + " " + SFX[kind][1],
+            u = wavURL(made);
+          AUD.push({ n, u, buf: await actx().decodeAudioData(u2ab(u)), start: cur, vol: 1 });
+          audUi();
+          dirty = true;
+          $("sfxmsg").textContent = "Added " + n + " at frame " + (cur + 1) + ".";
+        } catch (e) {
+          $("sfxmsg").textContent = "Couldn’t make it (" + ((e && e.message) || e) + ").";
+        }
+      }
+      function sfxUi() {
+        const on = EXI.includes("sfx");
+        $("sfxpn").hidden = !on;
+        const row = $("sfxrow");
+        if (on && !row.children.length)
+          Object.keys(SFX).forEach((k) => {
+            const b = document.createElement("button");
+            b.textContent = SFX[k][0] + " " + SFX[k][1];
+            b.onclick = () => sfxAdd(k);
+            row.appendChild(b);
+          });
+      }
       async function loadAudio(list) {
         const out = [];
         for (const a of list) {
@@ -10086,6 +10262,9 @@
           sand: "🏜 Sandstorm",
           leaves: "🍂 Falling leaves",
           embers: "🔥 Ash & embers",
+          hitshake: "💥 Hit shake",
+          quake: "🌋 Earthquake",
+          handheld: "🎥 Handheld",
         };
       const ST = mk(),
         LT = mk();
@@ -10689,10 +10868,50 @@
             x.globalAlpha = 0.35 + a * 0.65;
             blurOnto(x, ST, 4 + a * 14);
             x.restore();
-          } else if (t === "shake") {
-            const m = a * 16;
+          } else if (t === "shake" || t === "hitshake" || t === "quake" || t === "handheld") {
+            /* shakes: the picture moves (and turns a little), zoomed in just enough that no empty edge shows */
+            const rnd = (k) => {
+                const s = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+                return (s - Math.floor(s)) * 2 - 1;
+              },
+              tt = i / (+$("fps").value || 8),
+              edge = Math.min(1, p / 0.15, (1 - p) / 0.15 + (t === "hitshake" ? 1 : 0));
+            let dx = 0,
+              dy = 0,
+              rot = 0;
+            if (t === "shake") {
+              const m = a * 16 * (CH / 360);
+              dx = Math.sin(i * 12.9898) * m;
+              dy = Math.cos(i * 78.233) * m;
+            } else if (t === "hitshake") {
+              /* a hard jolt on the first frame that settles down by the last */
+              const env = Math.pow(1 - Math.min(1, p), 2),
+                m = CH * 0.07 * a * env;
+              dx = rnd(1) * m;
+              dy = rnd(2) * m;
+              rot = rnd(3) * a * 3 * env;
+            } else if (t === "quake") {
+              const m = CH * 0.035 * a * Math.max(0, edge);
+              dx = (Math.sin(tt * 11) * 0.6 + rnd(1) * 0.4) * m;
+              dy = (Math.cos(tt * 9) * 0.6 + rnd(2) * 0.4) * m;
+              rot = (Math.sin(tt * 7) * 0.7 + rnd(3) * 0.3) * a * 1.2 * Math.max(0, edge);
+            } else {
+              /* handheld: a slow, gentle drift */
+              const m = CH * 0.014 * a;
+              dx = (Math.sin(tt * 0.9) + Math.sin(tt * 2.3 + 1) * 0.4) * m;
+              dy = (Math.cos(tt * 1.1) + Math.sin(tt * 1.7 + 2) * 0.4) * m;
+              rot = Math.sin(tt * 0.7) * a * 0.8;
+            }
+            const r = (rot * Math.PI) / 180,
+              z = 1 + (2 * Math.max(Math.abs(dx), Math.abs(dy))) / Math.min(CW, CH) + Math.abs(r) * 0.8;
             if (L) x.clearRect(0, 0, CW, CH);
-            x.drawImage(ST, Math.sin(i * 12.9898) * m, Math.cos(i * 78.233) * m);
+            x.save();
+            x.translate(CW / 2 + dx, CH / 2 + dy);
+            x.rotate(r);
+            x.scale(z, z);
+            x.translate(-CW / 2, -CH / 2);
+            x.drawImage(ST, 0, 0);
+            x.restore();
           } else if (t === "tint") {
             x.save();
             x.globalCompositeOperation = "source-atop";
@@ -11033,12 +11252,32 @@
           gr.remove();
         }
       }
+      /* the Camera shake extension adds its own group */
+      function fxShakeUi() {
+        const sel = $("fxt");
+        let gr = document.getElementById("fxshake");
+        const on = EXI.includes("shake");
+        if (on && !gr) {
+          gr = document.createElement("optgroup");
+          gr.id = "fxshake";
+          gr.label = "Camera shake (extension)";
+          gr.innerHTML = '<option value="hitshake">💥 Hit shake</option><option value="quake">🌋 Earthquake</option><option value="handheld">🎥 Handheld</option>';
+          sel.appendChild(gr);
+        } else if (!on && gr) {
+          if (["hitshake", "quake", "handheld"].includes(sel.value)) sel.selectedIndex = 0;
+          gr.remove();
+        }
+      }
       fxWeatherUi();
+      fxShakeUi();
+      sfxUi();
       {
         const _exToggle = exToggle;
         exToggle = function (x) {
           _exToggle(x);
           fxWeatherUi();
+          fxShakeUi();
+          sfxUi();
         };
       }
       /* weather combos: several weathers at once, tuned to look good together. They are added as normal effects,
