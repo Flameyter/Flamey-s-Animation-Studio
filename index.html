@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.34</div>
+      <div id="studiover">Version 6.35</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5676,13 +5676,10 @@
           return HB_LAST + " is a hitbox";
         } },
         hbget: { cat: "hitbox", shape: "rep", tpl: "hitbox with id %1", a: [["str", ""]], run: (v) => (HB[String(v[0]).trim()] ? HB[String(v[0]).trim()].pts : "") },
-        hbvis: { cat: "hitbox", shape: "cmd", tpl: "visualize hitbox with id %1", a: [["str", ""]], run: (v) => {
+        /* a reporter: gives an SVG picture of the hitbox (tap it to see it) */
+        hbvis: { cat: "hitbox", shape: "rep", tpl: "visualize hitbox with id %1", a: [["str", ""]], run: (v) => {
           const hb = HB[String(v[0]).trim()];
-          if (!hb) return "no hitbox with that id";
-          hb.vis = true;
-          hbSave();
-          if (!playing && !bkExp && typeof ui === "function") ui();
-          return "data:image/svg+xml;utf8," + encodeURIComponent(hbSvg(hb));
+          return hb ? "data:image/svg+xml;utf8," + encodeURIComponent(hbSvg(hb)) : "";
         } },
         hbdel: { cat: "hitbox", shape: "cmd", tpl: "delete hitbox with id %1", a: [["str", ""]], run: (v) => {
           const id = String(v[0]).trim();
@@ -7026,7 +7023,7 @@
           }
           bkSave();
           bkRender();
-          if (tap && (rep || (group.length === 1 && group[0].t === "hbvis"))) {
+          if (tap && rep) {
             const q = body.getBoundingClientRect();
             bkBubble(group[0], ev.clientX - q.left, ev.clientY - q.top + 14);
           }
