@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.37</div>
+      <div id="studiover">Version 6.38</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5787,6 +5787,16 @@
             dx = bkNum(v[1]) - (Math.min(...xs) + Math.max(...xs)) / 2,
             dy = bkNum(v[2]) - (Math.min(...ys) + Math.max(...ys)) / 2;
           return hbText(P.pieces.map((q) => q.map((p) => [p[0] + dx, p[1] + dy])), P.live);
+        } },
+        hbwithid: { cat: "hitbox", shape: "rep", tpl: "%1 with id %2", a: [["str", ""], ["str", ""]], run: (v) => {
+          /* every point carries this id (so “make an hitbox” uses it), and they become that id's group for “deploy polygon” */
+          const P = hbParse(v[0]),
+            id = String(v[1] == null ? "" : v[1]).trim().replace(/[\s|#~]+/g, "_");
+          if (!P.pieces.length) return "";
+          if (!id) return hbText(P.pieces, P.live);
+          const pieces = P.pieces.map((q) => q.map((p) => Math.round(p[0] * 10) / 10 + "," + Math.round(p[1] * 10) / 10 + "#" + id).join(" "));
+          HBG[id] = [pieces.join(" | ")]; /* keeps the pieces apart */
+          return pieces.join(" | ") + (P.live ? " ~live" : "");
         } },
         xofchar: { cat: "rigs", shape: "rep", tpl: "x of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "x") },
         yofchar: { cat: "rigs", shape: "rep", tpl: "y of %1", a: [["menu", "", bkCharList]], run: (v, b) => bkCharPos(b, v[0], "y") },
