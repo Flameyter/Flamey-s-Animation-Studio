@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.14</div>
+      <div id="studiover">Version 7.15</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1965,6 +1965,7 @@
             ><button id="exmp4" class="g">Export video (.mp4)</button
             ><button id="exp" class="on">Export project (.json)</button>
           </div>
+          <div class="lbl vlen"></div>
           <div class="row">
             <label class="up">Open project<input type="file" id="imp" accept=".json,application/json" hidden /></label
             ><button id="ptshow">Project as text (copy / paste)</button>
@@ -2246,6 +2247,7 @@
             ><button id="zclr">Remove added files</button><b id="zxn" class="lbl"></b>
           </div>
           <div class="row"><button id="zgo" class="g">Make the .zip</button></div>
+          <div class="lbl vlen"></div>
           <div id="zmsg" class="lbl"></div>
         </div>
         <div class="pn">
@@ -9918,6 +9920,24 @@
           if (lock) lock.release().catch(() => {});
         }
       }
+      /* how long the video will be, shown next to the download buttons (Export and Zipper) */
+      function vidLenText() {
+        const fps = +$("fps").value || 8,
+          s = frames.length / fps,
+          m = Math.floor(s / 60),
+          h = Math.floor(m / 60),
+          sec = s - m * 60,
+          ss = (Math.round(sec * 10) / 10).toFixed(sec % 1 ? 1 : 0);
+        const t = h ? h + ":" + String(m % 60).padStart(2, "0") + ":" + ss.padStart(2, "0") : m + ":" + ss.padStart(ss.includes(".") ? 4 : 2, "0");
+        return "🎞 Video length: " + t + " (" + Math.round(s * 10) / 10 + " seconds · " + frames.length + " frame" + (frames.length === 1 ? "" : "s") + " at " + fps + " FPS)";
+      }
+      function vidLenUi() {
+        const t = vidLenText();
+        document.querySelectorAll(".vlen").forEach((e) => (e.textContent = t));
+      }
+      setInterval(() => {
+        if (view === "export" || view === "zipper") vidLenUi();
+      }, 500);
       /* Video export entry point:
          1. any audio tracks -> record with sound (exportAV)
          2. MP4 and WebCodecs available -> fast, exact encode
