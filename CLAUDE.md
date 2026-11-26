@@ -8,7 +8,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - Joel's YouTube channel: **Flamey :)**, https://www.youtube.com/@CrazyPWAF (about 2.65K subscribers). Videos made in the studio go here.
 
 ## Version
-- The version is shown at the bottom of the main menu (`#studiover`, "Version 7.02"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
+- The version is shown at the bottom of the main menu (`#studiover`, "Version 7.12"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
 
 ## Checking your work
 - Syntax: pull the inline scripts out into one file and run `node --check` on it.
@@ -49,6 +49,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - No physics or ragdoll blocks (Joel does that himself): the old `make () able to handle physics` block and the planned `if bounce, play sound` were dropped.
 - The Looks blocks `display () at x: () y: ()` and `sticker () at x: () y: ()` were removed (they place assets, which Joel does himself).
 - Zipper folders: `files/` (everything in Files, with that extension) and `blocks/` (with Blocks): `scripts.txt` = every script as scratchblocks text with `:: hat`/`:: reporter` and the category colour (`bkScratchText`, paste into scratchblocks to see them; hex colours work there (Joel checked). C blocks are written with their mouth in `{ … }` on separate lines and the colour after the closing `}`, because scratchblocks only makes its own C blocks from plain text), `blocks.json` (scripts + variables), `particles.json`, `hitboxes.json`. `blocks/scripts.svg` = the same text drawn by scratchblocks 3.6.4 (loaded from jsDelivr when needed, `sbLoad`, `bkScratchSvg`, style scratch3, scale 0.675 like Joel's SVGs); with no internet it is left out and info.txt says so. The Blocks page also has ⬇ Download scripts.txt, ⬇ Download scripts.svg and 📋 Copy as scratchblocks buttons. Zipper › Choose a .zip shows 📂 Open everything from this zip for a Zipper zip (`zipOpenAll`): project.json, then files/ (Files on; names already there are skipped), blocks/blocks.json (Blocks on; through `bkFix`), particles.json, hitboxes.json.
+- No progress loss (v7.12, `exportLong`): MP4 export (and the Zipper's video) is made offline with WebCodecs, not in real time: parts of 2 minutes of video, each finished part's encoded chunks kept in IndexedDB (`xp:v:<n>`, job in `xp:job` with a project signature `xpSig`); if it stops, the next MP4 export of the same project asks to carry on (scripts are re-run fast through the finished parts first). Sound (Audio tracks + block sounds, which `bkSndPlay` only notes while `bkSndOut.offline`) is mixed with OfflineAudioContext in 30 s pieces and encoded (AAC, else Opus). Everything is joined with mp4-muxer `StreamTarget` (chunked, `fastStart: false`, back-patches applied to the stored pieces) into one Blob, so an hour doesn't need all the memory. Screen wake lock while it works. Old real-time paths stay as fallbacks (and for WebM). The Zipper's GIF uses at most ~300 pictures (`gstep`).
 - The Zipper no longer loads frames (it was slow); the Upgrades "frames eaten" counter no longer counts for new zips.
 
 ## Defaults I guessed that Joel never answered

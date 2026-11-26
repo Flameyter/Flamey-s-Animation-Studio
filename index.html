@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.02</div>
+      <div id="studiover">Version 7.12</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -4523,6 +4523,15 @@
           a = fl ? { buf: fl.buf, vol: 1 } : /^\d+$/.test(String(x)) ? AUD[+x] : null;
         if (fl && !fl.buf) throw new Error("that file is still loading, or is not a sound the browser can play");
         if (!a || !a.buf) throw new Error(AUD.length ? "pick a sound" : "add a sound on the Audio page first");
+        if (bkExp && bkSndOut && bkSndOut.offline) {
+          /* a long MP4 is being made offline: note when the sound starts; it is mixed in afterwards */
+          const key = bg ? "bg:" + String(x) : b,
+            at = ((bkExpN || 1) - 1) / bkSndOut.fps;
+          if (BK_SND.some((q) => q.key === key && q.end > at)) return "";
+          bkSndOut.events.push({ buf: a.buf, at, vol: a.vol == null ? 1 : a.vol, times: bg ? 1 : times, loop: !!bg });
+          BK_SND.push({ key, end: bg ? Infinity : at + times * a.buf.duration });
+          return "";
+        }
         if (bkExp && !bkSndOut) return ""; /* a video is being made without sound: never play it out loud */
         const out = bkExp ? bkSndOut : null, /* only while a video is being exported */
           live = out || playing,
@@ -9677,6 +9686,238 @@
         }
         return enc.done();
       }
+      /* ── MP4 without losing progress. Frames are drawn and encoded as fast as the computer can go (not in real time, so
+         switching tabs can't spoil the video), in parts of 2 minutes of video. Every finished part is kept in the browser
+         (IndexedDB "xp:v:<n>", the job in "xp:job"), so if the tab closes, the next MP4 export of the same project offers
+         to carry on. The sound (Audio tracks, and sounds the blocks play, Files ones too) is mixed offline in 30-second
+         pieces. At the end everything is joined into one MP4 that is written out in pieces, so even an hour of video
+         doesn't need all of the memory. The screen is kept awake while it works. */
+      const XP_KEY = "xp:job";
+      async function xpClear(job) {
+        try {
+          for (let i = 0; i < ((job && job.parts) || 0); i++) await idbSet("xp:v:" + i, null);
+          await idbSet(XP_KEY, null);
+        } catch (e) {}
+      }
+      const xpSig = () => ptHash(JSON.stringify([CW, CH, +$("fps").value || 8, frames.length, proj(), EXI.includes("blocks") ? BKS : null, FX])).toString(36);
+      async function exportLong() {
+        await loadMux();
+        const fps = +$("fps").value || 8,
+          W = CW & ~1,
+          H = CH & ~1,
+          N = frames.length,
+          SUB = LAY.some((L) => L.k.some((f) => f.tw)) ? Math.max(1, Math.ceil(30 / fps)) : 1,
+          PART = Math.max(1, Math.round(fps * 120)),
+          parts = Math.ceil(N / PART),
+          sig = xpSig(),
+          say = (t) => ($("emsg").textContent = t);
+        const cfg = { codec: W * H > 921600 ? "avc1.640028" : "avc1.42001f", width: W, height: H, bitrate: Math.round(Math.max(1e6, Math.min(5e6, W * H * fps * SUB * 0.25))), framerate: fps * SUB };
+        if (!(await VideoEncoder.isConfigSupported(cfg)).supported) throw new Error("H.264 isn’t supported here");
+        let job = null;
+        try {
+          job = await idbGet(XP_KEY);
+        } catch (e) {}
+        let from = 0;
+        if (job && job.sig === sig && job.done > 0 && job.done < parts && confirm("A video of this project was being made and stopped after part " + job.done + " of " + parts + ". Carry on from there? (Cancel starts again.)")) from = job.done;
+        else {
+          if (job) await xpClear(job);
+          job = { sig, parts, done: 0, vcfg: null };
+          await idbSet(XP_KEY, job);
+        }
+        let lock = null;
+        try {
+          lock = navigator.wakeLock ? await navigator.wakeLock.request("screen") : null;
+        } catch (e) {}
+        const rc = mk(),
+          rg = rc.getContext("2d"),
+          du = Math.round(1e6 / (fps * SUB)),
+          breathe = () => new Promise((r) => setTimeout(r, 0));
+        BK_SND = [];
+        bkSndOut = { offline: true, events: [], fps };
+        try {
+          /* carrying on: run the scripts through the finished parts first (fast, nothing drawn) so they are where they were */
+          for (let i = 0; i < from * PART; i++) {
+            await bkExportFrame(i + 1);
+            if (i % 100 === 0) {
+              say("Catching up to part " + (from + 1) + ": frame " + (i + 1) + " of " + from * PART + "…");
+              await breathe();
+            }
+          }
+          for (let pi = from; pi < parts; pi++) {
+            const out = [];
+            let err = null;
+            const enc = new VideoEncoder({
+              output: (c, m) => {
+                const d = new Uint8Array(c.byteLength);
+                c.copyTo(d);
+                out.push({ t: c.type, ts: c.timestamp, du: c.duration || du, d });
+                if (m && m.decoderConfig && !job.vcfg) {
+                  const dc = m.decoderConfig;
+                  job.vcfg = { codec: dc.codec, codedWidth: dc.codedWidth, codedHeight: dc.codedHeight, description: dc.description ? new Uint8Array(dc.description.buffer ? dc.description.buffer.slice(dc.description.byteOffset || 0, (dc.description.byteOffset || 0) + dc.description.byteLength) : dc.description).slice() : undefined };
+                }
+              },
+              error: (e) => (err = e),
+            });
+            enc.configure(cfg);
+            const a = pi * PART,
+              b = Math.min(N, a + PART);
+            for (let i = a; i < b; i++) {
+              await bkExportFrame(i + 1);
+              for (let k = 0; k < SUB; k++) {
+                render(rg, i, false, false, false, k / SUB);
+                const f = new VideoFrame(rc, { timestamp: Math.round(((i + k / SUB) * 1e6) / fps), duration: du });
+                enc.encode(f, { keyFrame: i === a ? k === 0 : (i * SUB + k) % (fps * SUB * 2) === 0 });
+                f.close();
+              }
+              if (err) throw err;
+              if (i % 5 === 0 || enc.encodeQueueSize > 10) {
+                say("Making the video: part " + (pi + 1) + " of " + parts + " · frame " + (i + 1) + " of " + N + ". Finished parts are kept, so nothing is lost if this stops.");
+                await breathe();
+              }
+            }
+            await enc.flush();
+            enc.close();
+            if (err) throw err;
+            await idbSet("xp:v:" + pi, out);
+            job.done = pi + 1;
+            await idbSet(XP_KEY, job);
+          }
+          /* the sound, mixed offline */
+          const total = N / fps,
+            sr = 48000,
+            ev = [];
+          AUD.forEach((t) => t.buf && ev.push({ buf: t.buf, at: t.start / fps, dur: audLen(t, fps), vol: t.vol == null ? 1 : t.vol, loop: false }));
+          bkSndOut.events.forEach((e) => {
+            if (e.loop) ev.push({ buf: e.buf, at: e.at, dur: Math.max(0, total - e.at), vol: e.vol, loop: true });
+            else for (let k = 0; k < e.times; k++) ev.push({ buf: e.buf, at: e.at + k * e.buf.duration, dur: e.buf.duration, vol: e.vol, loop: false });
+          });
+          const ach = [];
+          let ameta = null,
+            acodec = null;
+          if (ev.length && window.AudioEncoder) {
+            for (const [codec, mc] of [["mp4a.40.2", "aac"], ["opus", "opus"]]) {
+              const c = { codec, sampleRate: sr, numberOfChannels: 2, bitrate: 128000 };
+              try {
+                if ((await AudioEncoder.isConfigSupported(c)).supported) {
+                  acodec = [c, mc];
+                  break;
+                }
+              } catch (e) {}
+            }
+          }
+          if (ev.length && acodec) {
+            let aerr = null;
+            const aenc = new AudioEncoder({
+              output: (c, m) => {
+                const d = new Uint8Array(c.byteLength);
+                c.copyTo(d);
+                ach.push({ t: c.type, ts: c.timestamp, du: c.duration, d });
+                if (m && m.decoderConfig && !ameta) {
+                  const dc = m.decoderConfig;
+                  ameta = { decoderConfig: { codec: dc.codec, sampleRate: dc.sampleRate, numberOfChannels: dc.numberOfChannels, description: dc.description ? new Uint8Array(dc.description.buffer ? dc.description.buffer.slice(dc.description.byteOffset || 0, (dc.description.byteOffset || 0) + dc.description.byteLength) : dc.description).slice() : undefined } };
+                }
+              },
+              error: (e) => (aerr = e),
+            });
+            aenc.configure(acodec[0]);
+            const SEG = 30;
+            for (let s0 = 0; s0 < total - 1e-6; s0 += SEG) {
+              say("Mixing the sound: " + Math.round(s0) + " of " + Math.round(total) + " seconds…");
+              const len = Math.min(SEG, total - s0),
+                oc = new OfflineAudioContext(2, Math.max(1, Math.ceil(len * sr)), sr);
+              ev.forEach((e) => {
+                const e1 = e.at + e.dur;
+                if (e1 <= s0 || e.at >= s0 + len || !(e.dur > 0)) return;
+                const src = oc.createBufferSource(),
+                  g = oc.createGain();
+                src.buffer = e.buf;
+                src.loop = e.loop;
+                g.gain.value = e.vol;
+                src.connect(g).connect(oc.destination);
+                const when = Math.max(0, e.at - s0),
+                  off = Math.max(0, s0 - e.at),
+                  d = Math.min(e1, s0 + len) - Math.max(e.at, s0);
+                if (e.loop) {
+                  src.start(when, off % e.buf.duration);
+                  src.stop(when + d);
+                } else src.start(when, off, d);
+              });
+              const buf = await oc.startRendering(),
+                data = new Float32Array(buf.length * 2);
+              data.set(buf.getChannelData(0), 0);
+              data.set(buf.getChannelData(1), buf.length);
+              const ad = new AudioData({ format: "f32-planar", sampleRate: sr, numberOfFrames: buf.length, numberOfChannels: 2, timestamp: Math.round(s0 * 1e6), data });
+              aenc.encode(ad);
+              ad.close();
+              if (aerr) throw aerr;
+              await breathe();
+            }
+            await aenc.flush();
+            aenc.close();
+            if (aerr) throw aerr;
+          }
+          /* join it all into one MP4, written out in pieces */
+          say("Joining the parts into one MP4…");
+          const pieces = [],
+            patches = [];
+          let end = 0;
+          const target = new Mp4Muxer.StreamTarget({
+            onData: (data, position) => {
+              if (position >= end) {
+                pieces.push({ pos: position, blob: new Blob([data.slice()]) });
+                end = position + data.byteLength;
+              } else patches.push({ pos: position, d: data.slice() }); /* the muxer goes back to fill in a size */
+            },
+            chunked: true,
+            chunkSize: 8 * 1048576,
+          });
+          const mux = new Mp4Muxer.Muxer({
+            target,
+            video: { codec: "avc", width: W, height: H },
+            audio: ach.length ? { codec: acodec[1], numberOfChannels: 2, sampleRate: sr } : undefined,
+            fastStart: false,
+          });
+          let ai = 0,
+            first = true;
+          const addAudioUpTo = (ts) => {
+            while (ai < ach.length && ach[ai].ts <= ts) {
+              const c = ach[ai];
+              mux.addAudioChunkRaw(c.d, c.t, c.ts, c.du, ai === 0 ? ameta : undefined);
+              ai++;
+            }
+          };
+          for (let pi = 0; pi < parts; pi++) {
+            const out = (await idbGet("xp:v:" + pi)) || [];
+            for (const c of out) {
+              addAudioUpTo(c.ts);
+              mux.addVideoChunkRaw(c.d, c.t, c.ts, c.du, first ? { decoderConfig: job.vcfg } : undefined);
+              first = false;
+            }
+            say("Joining the parts into one MP4: " + (pi + 1) + " of " + parts + "…");
+            await breathe();
+          }
+          addAudioUpTo(Infinity);
+          mux.finalize();
+          for (const pt of patches) {
+            const k = pieces.findIndex((q) => pt.pos >= q.pos && pt.pos < q.pos + q.blob.size);
+            if (k < 0) continue;
+            const q = pieces[k],
+              off = pt.pos - q.pos;
+            q.blob = new Blob([q.blob.slice(0, off), pt.d, q.blob.slice(off + pt.d.byteLength)]);
+          }
+          pieces.sort((x, y) => x.pos - y.pos);
+          const file = new Blob(
+            pieces.map((q) => q.blob),
+            { type: "video/mp4" },
+          );
+          await xpClear(job);
+          return file;
+        } finally {
+          bkSndOut = null;
+          BK_SND = [];
+          if (lock) lock.release().catch(() => {});
+        }
+      }
       /* Video export entry point:
          1. any audio tracks -> record with sound (exportAV)
          2. MP4 and WebCodecs available -> fast, exact encode
@@ -9686,8 +9927,20 @@
         await vecPrep();
         await bkExportBegin(); /* Blocks: keep a copy of the project; the scripts run frame by frame */
         try {
+          const withSound = AUD.length || (bkExp && EXI.includes("blocks") && /"t":"au(talk|bg|rep)"/.test(JSON.stringify(BKS)));
+          /* MP4: made offline in parts that are kept, so a long video can't be lost (sound mixed offline too) */
+          if (kind === "mp4" && window.VideoEncoder && window.VideoFrame && (!withSound || window.AudioEncoder)) {
+            try {
+              save(pfile(".mp4"), await exportLong());
+              return;
+            } catch (e) {
+              $("emsg").textContent = "The MP4 maker stopped (" + ((e && e.message) || e) + "). Trying another way…";
+              await bkExportEnd();
+              await bkExportBegin();
+            }
+          }
           /* sound: tracks on the Audio page, or sound blocks in a script (they can play sounds from Files too) */
-          if (AUD.length || (bkExp && EXI.includes("blocks") && /"t":"au(talk|bg|rep)"/.test(JSON.stringify(BKS)))) return await exportAV(kind);
+          if (withSound) return await exportAV(kind);
           if (kind === "mp4" && window.VideoEncoder) {
             try {
               save(pfile(".mp4"), await exportMp4Codecs());
@@ -13692,7 +13945,9 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
             gc = mk2(gw, gh),
             gx = gc.getContext("2d"),
             gimgs = [];
-          for (let i = 0; i < frames.length; i++) {
+          /* a long video only puts every few frames into the gif (at most about 300 pictures), so memory can't run out */
+          const gstep = Math.max(1, Math.ceil(frames.length / 300));
+          for (let i = 0; i < frames.length; i += gstep) {
             say("Getting the gif ready: " + (i + 1) + " of " + frames.length + "…");
             render(fx2, i, false);
             gx.imageSmoothingQuality = "high";
@@ -13736,7 +13991,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           try {
             files.push({
               name: uniq("", "animation", ".gif"),
-              data: makeGif(gimgs, gw, gh, Math.max(2, Math.round(100 / (+$("fps").value || 8)))),
+              data: makeGif(gimgs, gw, gh, Math.max(2, Math.round((100 * gstep) / (+$("fps").value || 8)))),
             });
             if (gk < 1)
               extra.push(
