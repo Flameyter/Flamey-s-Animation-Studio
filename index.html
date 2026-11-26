@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.44</div>
+      <div id="studiover">Version 6.45</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1209,6 +1209,8 @@
             ><button id="next">›</button><button id="last">⏭</button><b id="fl">1 / 1</b
             ><label class="sl">FPS<input type="number" id="fps" min="1" max="30" value="8" /></label
             ><button id="onion" class="on">Onion</button
+            ><button id="hbpshow" title="Show the hitbox point (drag it to read x and y)" hidden>⌖ Show point</button
+            ><button id="hbphide" title="Hide the hitbox point" hidden>⌖ Hide point</button
             ><button id="twgo" title="Tween on: move an asset on a later frame and the frames in between fill in so it glides">Tween: Off</button
             ><button id="twun" title="Undo the last tween">Undo tween</button>
           </div>
@@ -5178,6 +5180,7 @@
         }, 0);
         document.querySelectorAll('.bkcatb[data-c="particles"]').forEach((b) => (b.style.display = on ? "" : "none"));
         document.querySelectorAll('.bkcatb[data-c="hitbox"]').forEach((b) => (b.style.display = hbOn() ? "" : "none"));
+        if (typeof hbPointUi === "function") hbPointUi();
         if (typeof bkCat !== "undefined" && ((!on && bkCat === "particles") || (!hbOn() && bkCat === "hitbox"))) {
           bkCat = "";
           if (typeof bkFlyUi === "function") bkFlyUi();
@@ -5499,8 +5502,27 @@
         HBP = JSON.parse(localStorage.getItem("oss_hbpoint") || "null") || HBP;
       } catch (e) {}
       let hbpDrag = false;
+      /* the Show point / Hide point buttons next to Onion (only with the Hitbox extension) */
+      function hbPointUi() {
+        const on = hbOn(),
+          sh = HBP.show !== false;
+        $("hbpshow").hidden = !on;
+        $("hbphide").hidden = !on;
+        $("hbpshow").classList.toggle("on", sh);
+        $("hbphide").classList.toggle("on", !sh);
+      }
+      const hbPointSet = (sh) => {
+        HBP.show = sh;
+        try {
+          localStorage.setItem("oss_hbpoint", JSON.stringify(HBP));
+        } catch (e) {}
+        hbPointUi();
+      };
+      $("hbpshow").onclick = () => hbPointSet(true);
+      $("hbphide").onclick = () => hbPointSet(false);
+      hbPointUi();
       function hbPointDraw(x) {
-        if (!hbOn()) return;
+        if (!hbOn() || HBP.show === false) return;
         const X = CW / 2 + HBP.x,
           Y = CH / 2 - HBP.y,
           r = 7,
@@ -5542,7 +5564,7 @@
       window.addEventListener(
         "pointerdown",
         (e) => {
-          if (!hbOn() || view !== "edit" || e.target !== $("c")) return;
+          if (!hbOn() || HBP.show === false || view !== "edit" || e.target !== $("c")) return;
           const [px, py, k] = hbPointAt(e);
           if (Math.hypot(px - (CW / 2 + HBP.x), py - (CH / 2 - HBP.y)) > 14 / Math.max(0.3, k)) return;
           e.stopImmediatePropagation();
@@ -5550,7 +5572,7 @@
           hbpDrag = true;
           const mv = (ev) => {
               const [qx, qy] = hbPointAt(ev);
-              HBP = { x: Math.round(qx - CW / 2), y: Math.round(CH / 2 - qy) };
+              HBP = { x: Math.round(qx - CW / 2), y: Math.round(CH / 2 - qy), show: true };
             },
             up = () => {
               hbpDrag = false;
