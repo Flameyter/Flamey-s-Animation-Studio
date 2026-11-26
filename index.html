@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.13</div>
+      <div id="studiover">Version 7.14</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1143,7 +1143,7 @@
       <div class="v v-settings" id="settings" hidden>
         <h2>⚙ Settings</h2>
         <div class="lbl">Video speed</div>
-        <label class="sl">FPS<input type="number" id="fps2" min="1" max="30" value="8" /></label>
+        <label class="sl">FPS (decimals like 0.5 work: slower than 1 frame a second)<input type="number" id="fps2" min="0.1" max="30" step="0.1" value="8" /></label>
         <div class="lbl" style="margin-top: 14px">Canvas size (the picture, in pixels)</div>
         <label class="sl">Width<input type="number" id="sw" min="64" max="1920" value="640" /></label>
         <label class="sl">Height<input type="number" id="sh" min="64" max="1920" value="360" /></label>
@@ -1221,7 +1221,7 @@
           <div class="row">
             <button id="first">⏮</button><button id="prev">‹</button><button id="play" class="g">▶</button
             ><button id="next">›</button><button id="last">⏭</button><b id="fl">1 / 1</b
-            ><label class="sl">FPS<input type="number" id="fps" min="1" max="30" value="8" /></label
+            ><label class="sl">FPS<input type="number" id="fps" min="0.1" max="30" step="0.1" value="8" /></label
             ><button id="onion" class="on">Onion</button
             ><button id="hbpshow" title="Show the hitbox point (drag it to read x and y)" hidden>⌖ Show point</button
             ><button id="hbphide" title="Hide the hitbox point" hidden>⌖ Hide point</button
@@ -9706,7 +9706,7 @@
           W = CW & ~1,
           H = CH & ~1,
           N = frames.length,
-          SUB = LAY.some((L) => L.k.some((f) => f.tw)) ? Math.max(1, Math.ceil(30 / fps)) : 1,
+          SUB = LAY.some((L) => L.k.some((f) => f.tw)) ? Math.min(30, Math.max(1, Math.ceil(30 / fps))) : 1,
           PART = Math.max(1, Math.round(fps * 120)),
           parts = Math.ceil(N / PART),
           sig = xpSig(),
@@ -9766,7 +9766,7 @@
               for (let k = 0; k < SUB; k++) {
                 render(rg, i, false, false, false, k / SUB);
                 const f = new VideoFrame(rc, { timestamp: Math.round(((i + k / SUB) * 1e6) / fps), duration: du });
-                enc.encode(f, { keyFrame: i === a ? k === 0 : (i * SUB + k) % (fps * SUB * 2) === 0 });
+                enc.encode(f, { keyFrame: i === a ? k === 0 : (i * SUB + k) % Math.max(1, Math.round(fps * SUB * 2)) === 0 });
                 f.close();
               }
               if (err) throw err;
@@ -14184,7 +14184,8 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         $("setmsg").textContent = "";
       }
       $("fps2").oninput = () => {
-        const v = Math.max(1, Math.min(30, Math.round(+$("fps2").value) || 8));
+        /* decimals are allowed (0.5 = one frame every 2 seconds), from 0.1 to 30 */
+        const v = Math.max(0.1, Math.min(30, Math.round((+$("fps2").value || 8) * 10) / 10));
         $("fps").value = v;
         $("fps").onchange && $("fps").onchange();
       };
