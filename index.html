@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.12</div>
+      <div id="studiover">Version 7.13</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2234,7 +2234,7 @@
               file
             </li>
             <li><b>video.mp4</b> · the current video</li>
-            <li><b>animation.gif</b> · the project as a gif</li>
+            <li><b>animation.gif</b> · the project as a gif (left out when the video is longer than 1 minute)</li>
             <li><b>assets/</b> · every asset as a picture (assets that came from an SVG stay SVG)</li>
             <li><b>sound/</b> · your sound files, only if there is sound</li>
             <li><b>files/</b> · everything in 📁 Files, with the Files extension</li>
@@ -13945,9 +13945,10 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
             gc = mk2(gw, gh),
             gx = gc.getContext("2d"),
             gimgs = [];
-          /* a long video only puts every few frames into the gif (at most about 300 pictures), so memory can't run out */
-          const gstep = Math.max(1, Math.ceil(frames.length / 300));
-          for (let i = 0; i < frames.length; i += gstep) {
+          /* no gif for a video longer than 1 minute (Joel's choice); otherwise at most about 300 pictures */
+          const noGif = frames.length / (+$("fps").value || 8) > 60,
+            gstep = Math.max(1, Math.ceil(frames.length / 300));
+          for (let i = 0; i < (noGif ? 0 : frames.length); i += gstep) {
             say("Getting the gif ready: " + (i + 1) + " of " + frames.length + "…");
             render(fx2, i, false);
             gx.imageSmoothingQuality = "high";
@@ -13988,7 +13989,8 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           });
           say("Making the gif…");
           await new Promise((r) => setTimeout(r, 0));
-          try {
+          if (noGif) extra.push("Gif: left out, because the video is longer than 1 minute.");
+          else try {
             files.push({
               name: uniq("", "animation", ".gif"),
               data: makeGif(gimgs, gw, gh, Math.max(2, Math.round((100 * gstep) / (+$("fps").value || 8)))),
