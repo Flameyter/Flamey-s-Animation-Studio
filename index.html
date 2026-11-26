@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.47</div>
+      <div id="studiover">Version 6.48</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -4901,7 +4901,7 @@
         for (const L of LAY) {
           const f = L.k && L.k[n - 1];
           const it = f && f.items && f.items.find((q) => q.rig === rig.id);
-          if (it) return Math.round(it[axis]);
+          if (it) return Math.round(axis === "x" ? it.x - CW / 2 : CH / 2 - it.y); /* 0,0 is the middle of the stage, y goes up */
         }
         return 0;
       }
