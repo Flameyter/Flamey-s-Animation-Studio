@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.48</div>
+      <div id="studiover">Version 6.58</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1830,7 +1830,7 @@
               <li>An extension can make a <b>new slot</b> on the main menu (like <b>Export</b> or <b>Blocks</b>), or be an <b>add-on</b> that works inside the slots you already have (like <b>Upgrades</b>).</li>
               <li><b>🧱 Blocks</b>: build scripts out of blocks that run while your video plays or exports.</li>
               <li><b>⬆ Upgrades</b>: energy, prices and unlocks for the studio.</li>
-              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, and <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands). When 💨 Wind is on, rain, snow, hail and fog lean and drift with it. Combos add several at once that look good together: <b>⛈ Thunderstorm</b>, <b>🌨 Blizzard</b> and <b>🌦 After the storm</b>. Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
+              <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands), <b>🏜 Sandstorm</b> blows a sandy haze and grains across (Angle = which way, colour box = the sand), <b>🍂 Falling leaves</b> flutter down, and <b>🔥 Ash &amp; embers</b> sends glowing embers up while ash drifts down (colour box = the glow). When 💨 Wind is on, rain, snow, hail, leaves, embers and fog lean and drift with it, and a sandstorm blows harder. Combos add several at once that look good together: <b>⛈ Thunderstorm</b>, <b>🌨 Blizzard</b> and <b>🌦 After the storm</b>. Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
             </ul>
           </details>
           <details>
@@ -3992,7 +3992,7 @@
         {
           id: "weather", types: ["addon"], icon: "🌧", name: "Weather", color: "#3d8bff", target: "effects", cost: 0,
           origin: "Hand-drawn weather by Joel.",
-          instr: "Adds a Weather group to Add an effect in Effects. 🌧 Rain: drawn rain falls over the video, in Watch video and in exports.",
+          instr: "Adds a Weather group to Add an effect in Effects: 🌧 Rain, ❄ Snow, ⚡ Lightning, 🌫 Fog, 💨 Wind, 🧊 Hail, 🌈 Rainbow, 🏜 Sandstorm, 🍂 Falling leaves, 🔥 Ash & embers, and combos. They show in Watch video and in exports.",
           art: {},
         },
         {
@@ -4920,6 +4920,12 @@
         sparks: { color: "#ffc93c", brightness: 20, size: 5, "poly sides": 4, ratio: "1:5", strips: 3, "fall speed": 6, gravity: 1 },
         dust: { color: "#b9a78f", transparency: 55, size: 9, "poly sides": 0, warp: 45, strips: 1, "fall speed": 1, gravity: 0.1 },
         rubble: { color: "#7a7166", size: 11, "poly sides": 5, warp: 55, curve: 15, strips: 1, "fall speed": 14, gravity: 4 },
+        /* a minus fall speed goes up: smoke and bubbles float, fire sparks pop up and then fall */
+        smoke: { color: "#8c8c8c", brightness: 10, transparency: 60, size: 14, "poly sides": 0, warp: 40, strips: 1, "fall speed": -3, gravity: -0.1 },
+        "fire sparks": { color: "#ff7a1a", brightness: 20, size: 4, "poly sides": 4, ratio: "1:3", strips: 2, "fall speed": -9, gravity: 1.3 },
+        bubbles: { color: "#7cc4f0", brightness: 10, transparency: 40, size: 9, "poly sides": 0, strips: 1, "fall speed": -4, gravity: -0.15 },
+        tears: { color: "#7cc8ff", brightness: 10, transparency: 20, size: 5, "poly sides": 0, ratio: "2:3", curve: 50, strips: 1, "fall speed": 6, gravity: 1.5 },
+        "sweat drop": { color: "#b8e6ff", brightness: 15, transparency: 25, size: 4, "poly sides": 0, ratio: "3:4", curve: 50, strips: 1, "fall speed": 4, gravity: 1 },
       };
       let PT = [];
       try {
@@ -10077,6 +10083,9 @@
           wind: "💨 Wind",
           hail: "🧊 Hail",
           rainbow: "🌈 Rainbow",
+          sand: "🏜 Sandstorm",
+          leaves: "🍂 Falling leaves",
+          embers: "🔥 Ash & embers",
         };
       const ST = mk(),
         LT = mk();
@@ -10112,7 +10121,7 @@
       function fxOn(f, i) {
         if (i < f.start) return false;
         if (i <= f.end) return true;
-        const tail = { rain: RAIN_TAIL, snow: SNOW_TAIL, lightning: 0.4, fog: FOG_TAIL, wind: 1.5, hail: 1.2, rainbow: 2 }[f.t] || 0;
+        const tail = { rain: RAIN_TAIL, snow: SNOW_TAIL, lightning: 0.4, fog: FOG_TAIL, wind: 1.5, hail: 1.2, rainbow: 2, sand: 1.5, leaves: LEAF_TAIL, embers: EMBER_TAIL }[f.t] || 0;
         return tail > 0 && i <= f.end + Math.ceil(tail * (+$("fps").value || 8));
       }
       /* ❄ Snow (Weather extension): drawn in code like the rain. Round white flakes of different sizes with a soft blue
@@ -10313,6 +10322,179 @@
         }
         x.restore();
       }
+      /* 🏜 Sandstorm: a sandy haze (thicker near the ground) with grains and streaks blowing across. Rolls in over 1 s and
+         settles over 1.5 s after it ends. Strength = how thick and fast, See-through (default 15%), Angle = which way it
+         blows (below 0 = left) and how much it slopes, colour box = the sand's colour. A 💨 Wind on the same frames pushes it too. */
+      function sandDraw(x, e, i) {
+        const [t, tEnd] = wxT(e, i),
+          k = Math.min(1, t / 1) * (t > tEnd ? Math.max(0, 1 - (t - tEnd) / 1.5) : 1);
+        if (k <= 0) return;
+        const pow = 0.3 + (e.amt / 100) * 1.2,
+          ang = (e.ang == null ? 0 : e.ang) + wxWind(e, i).drift * 8,
+          dir = ang < 0 ? -1 : 1,
+          slope = Math.tan((Math.min(30, Math.abs(ang)) * Math.PI) / 180) * 0.5,
+          col = /^#[0-9a-f]{6}$/i.test(e.col || "") && e.col !== "#000000" ? e.col : "#d8b77a",
+          R = wxSeed((e.start + 13) * 2654435761);
+        x.save();
+        x.globalAlpha = wxAlpha(e, 15) * k;
+        const g = x.createLinearGradient(0, 0, 0, CH);
+        g.addColorStop(0, fxMix(col, 0.15, 0.18 * pow));
+        g.addColorStop(1, fxMix(col, 0, 0.5 * pow));
+        x.fillStyle = g;
+        x.fillRect(0, 0, CW, CH);
+        x.lineCap = "round";
+        /* long faint streaks */
+        const ns = Math.round(8 + pow * 14);
+        for (let q = 0; q < ns; q++) {
+          const len = CW * (0.2 + R() * 0.35),
+            y0 = CH * (0.1 + R() * 0.9),
+            v = CW * (1.1 + R() * 0.9) * pow,
+            per = CW + len * 2,
+            pos = (R() * per + t * v) % per,
+            xs = dir > 0 ? pos - len : CW - pos + len;
+          x.strokeStyle = fxMix(col, 0.25, 0.25);
+          x.lineWidth = Math.max(1, CH * (0.006 + R() * 0.008));
+          x.beginPath();
+          x.moveTo(xs, y0);
+          x.lineTo(xs - dir * len, y0 - slope * len * dir);
+          x.stroke();
+        }
+        /* grains */
+        const n = Math.round(80 + pow * 260);
+        x.fillStyle = fxMix(col, 0, 0.85);
+        for (let q = 0; q < n; q++) {
+          const y0 = CH * R(),
+            v = CW * (1.4 + R() * 1.4) * pow,
+            per = CW + 40,
+            pos = (R() * per + t * v) % per,
+            px = dir > 0 ? pos - 20 : CW + 20 - pos,
+            py = y0 - slope * (px - CW / 2) * dir + Math.sin(t * 6 + q) * CH * 0.006,
+            s = Math.max(1, CH * (0.002 + R() * 0.004));
+          x.fillRect(px, py, s * 2.2, s);
+        }
+        x.restore();
+      }
+      /* 🍂 Falling leaves: autumn leaves that flutter down, swaying and turning. Strength = how many, See-through
+         (default 0%), Angle = how they lean (they lean with a 💨 Wind too). The ones still falling finish after it ends. */
+      const LEAF_TAIL = 8;
+      function leafDraw(x, e, i) {
+        const [t, tEnd] = wxT(e, i),
+          n = Math.round(6 + (e.amt / 100) * 40),
+          slant = Math.tan((wxAng(e, i, 0) * Math.PI) / 180),
+          R = wxSeed((e.start + 17) * 2246822519),
+          cols = ["#d9531e", "#e8a317", "#b5341c", "#8a5a2b", "#f0c419", "#c4661f"],
+          live = Math.min(1, 0.25 + t / 1.5);
+        x.save();
+        x.globalAlpha = wxAlpha(e, 0);
+        x.lineCap = "round";
+        for (let q = 0; q < n; q++) {
+          const s = CH * (0.022 + R() * 0.02),
+            v = CH * (0.12 + R() * 0.1),
+            per = CH + s * 6,
+            ph = R() * per,
+            x0 = R() * (CW + CH * Math.abs(slant)) - (slant < 0 ? CH * Math.abs(slant) : 0),
+            amp = CH * (0.02 + R() * 0.045),
+            fr = 0.8 + R() * 1.2,
+            spin = (R() * 2 - 1) * 2.5,
+            phs = R() * 6.283,
+            c = cols[Math.floor(R() * cols.length)],
+            on = R() < live;
+          if (!on) continue;
+          const pos = ph + t * v,
+            born = (Math.floor(pos / per) * per - ph) / v;
+          if (t > tEnd && born > tEnd) continue;
+          const py = (pos % per) - s * 3,
+            sw = Math.sin(t * fr + phs),
+            px = x0 - slant * py + sw * amp;
+          x.save();
+          x.translate(px, py);
+          x.rotate(phs + t * spin + sw * 0.7);
+          x.scale(1, 0.6 + 0.4 * Math.abs(Math.cos(t * fr * 1.3 + phs)));
+          x.fillStyle = c;
+          x.beginPath();
+          x.moveTo(-s, 0);
+          x.bezierCurveTo(-s * 0.4, -s * 0.85, s * 0.5, -s * 0.75, s, 0);
+          x.bezierCurveTo(s * 0.5, s * 0.75, -s * 0.4, s * 0.85, -s, 0);
+          x.fill();
+          x.strokeStyle = "rgba(60,30,10,0.55)";
+          x.lineWidth = Math.max(1, s * 0.09);
+          x.beginPath();
+          x.moveTo(-s * 1.25, 0);
+          x.lineTo(s * 0.85, 0);
+          x.stroke();
+          x.restore();
+        }
+        x.restore();
+      }
+      /* 🔥 Ash & embers: glowing embers float up and flicker out while grey ash drifts down. Strength = how many,
+         See-through (default 0%), Angle = lean (with a 💨 Wind too), colour box = the embers' glow. */
+      const EMBER_TAIL = 3;
+      function emberDraw(x, e, i) {
+        const [t, tEnd] = wxT(e, i),
+          n = Math.round(10 + (e.amt / 100) * 60),
+          slant = Math.tan((wxAng(e, i, 0) * Math.PI) / 180),
+          col = /^#[0-9a-f]{6}$/i.test(e.col || "") && e.col !== "#000000" ? e.col : "#ff7a1a",
+          R = wxSeed((e.start + 21) * 2654435761),
+          live = Math.min(1, 0.3 + t / 1);
+        x.save();
+        const A = wxAlpha(e, 0);
+        /* embers going up */
+        for (let q = 0; q < n; q++) {
+          const r = CH * (0.005 + R() * 0.006),
+            v = CH * (0.14 + R() * 0.22),
+            per = CH + 40,
+            ph = R() * per,
+            x0 = R() * (CW + CH * Math.abs(slant)) - (slant > 0 ? CH * Math.abs(slant) : 0),
+            amp = CH * (0.01 + R() * 0.03),
+            fr = 1 + R() * 2,
+            phs = R() * 6.283,
+            on = R() < live;
+          if (!on) continue;
+          const pos = ph + t * v,
+            born = (Math.floor(pos / per) * per - ph) / v;
+          if (t > tEnd && born > tEnd) continue;
+          const up = pos % per,
+            py = CH + 20 - up,
+            px = x0 + slant * up + Math.sin(t * fr + phs) * amp,
+            fade = Math.max(0, 1 - up / per) * (0.6 + 0.4 * Math.sin(t * 9 + phs * 3));
+          if (fade <= 0.02) continue;
+          const gl = x.createRadialGradient(px, py, 0, px, py, r * 6);
+          gl.addColorStop(0, fxMix(col, 0, 0.8 * fade * A));
+          gl.addColorStop(1, fxMix(col, 0, 0));
+          x.fillStyle = gl;
+          x.fillRect(px - r * 6, py - r * 6, r * 12, r * 12);
+          x.fillStyle = fxMix(col, 0.35, Math.min(1, fade * 1.4) * A);
+          x.beginPath();
+          x.arc(px, py, r, 0, 7);
+          x.fill();
+        }
+        /* ash coming down */
+        const na = Math.round(n * 0.6);
+        for (let q = 0; q < na; q++) {
+          const s = CH * (0.004 + R() * 0.006),
+            v = CH * (0.06 + R() * 0.06),
+            per = CH + 20,
+            ph = R() * per,
+            x0 = R() * (CW + CH * Math.abs(slant)) - (slant < 0 ? CH * Math.abs(slant) : 0),
+            phs = R() * 6.283,
+            grey = 90 + Math.floor(R() * 70),
+            on = R() < live;
+          if (!on) continue;
+          const pos = ph + t * v,
+            born = (Math.floor(pos / per) * per - ph) / v;
+          if (t > tEnd && born > tEnd) continue;
+          const py = (pos % per) - 10,
+            px = x0 - slant * py + Math.sin(t * 1.3 + phs) * CH * 0.02;
+          x.save();
+          x.translate(px, py);
+          x.rotate(phs + t * 1.5);
+          x.globalAlpha = 0.75 * A;
+          x.fillStyle = "rgb(" + grey + "," + grey + "," + grey + ")";
+          x.fillRect(-s, -s * 0.6, s * 2, s * 1.2);
+          x.restore();
+        }
+        x.restore();
+      }
       /* 🌈 Rainbow: a see-through arc of seven colours that fades in over 1.5 s and out after it ends.
          Strength = how big, See-through (default 45%), Angle = where it stands, left to right. */
       function rainbowDraw(x, e, i) {
@@ -10495,6 +10677,9 @@
           else if (t === "wind") windDraw(x, e, i);
           else if (t === "hail") hailDraw(x, e, i);
           else if (t === "rainbow") rainbowDraw(x, e, i);
+          else if (t === "sand") sandDraw(x, e, i);
+          else if (t === "leaves") leafDraw(x, e, i);
+          else if (t === "embers") emberDraw(x, e, i);
           else if (t === "blur") {
             x.clearRect(0, 0, CW, CH);
             blurOnto(x, ST, 2 + a * 14);
@@ -10732,10 +10917,10 @@
           m.value = e.amt;
           c.value = e.col;
           if (WX_KINDS.includes(e.t)) {
-            const defCol = { lightning: "#6f5cff", fog: "#e3e8ef", wind: "#ffffff" }[e.t];
+            const defCol = { lightning: "#6f5cff", fog: "#e3e8ef", wind: "#ffffff", sand: "#d8b77a", embers: "#ff7a1a" }[e.t];
             c.hidden = !defCol; /* rain, snow, hail and rainbow have their own colours */
             if (defCol) {
-              c.title = { lightning: "Lightning colour", fog: "Fog colour", wind: "Wind colour" }[e.t];
+              c.title = { lightning: "Lightning colour", fog: "Fog colour", wind: "Wind colour", sand: "Sand colour", embers: "Ember colour" }[e.t];
               if (!/^#[0-9a-f]{6}$/i.test(e.col || "") || e.col === "#000000") c.value = e.col = defCol;
             }
             const lab = document.createElement("label");
@@ -10820,7 +11005,7 @@
         });
       }
       /* the weather kinds and how a new one starts */
-      const WX_KINDS = ["rain", "snow", "lightning", "fog", "wind", "hail", "rainbow"];
+      const WX_KINDS = ["rain", "snow", "lightning", "fog", "wind", "hail", "rainbow", "sand", "leaves", "embers"];
       const WX_DEF = {
         rain: { see: 35, ang: 9 },
         snow: { see: 15, ang: 0, amt: 55 },
@@ -10828,6 +11013,9 @@
         fog: { see: 20, ang: 0, amt: 55, col: "#e3e8ef" },
         wind: { see: 25, ang: 0, amt: 55, col: "#ffffff" },
         hail: { see: 10, ang: 5, amt: 50 },
+        sand: { see: 15, ang: 10, amt: 55, col: "#d8b77a" },
+        leaves: { see: 0, ang: 0, amt: 45 },
+        embers: { see: 0, ang: 0, amt: 50, col: "#ff7a1a" },
         rainbow: { see: 45, ang: 0, amt: 60 },
       };
       function fxWeatherUi() {
@@ -10838,7 +11026,7 @@
           gr = document.createElement("optgroup");
           gr.id = "fxweather";
           gr.label = "Weather (extension)";
-          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option><option value="fog">🌫 Fog</option><option value="wind">💨 Wind</option><option value="hail">🧊 Hail</option><option value="rainbow">🌈 Rainbow</option><option value="c:storm">⛈ Thunderstorm (combo)</option><option value="c:blizzard">🌨 Blizzard (combo)</option><option value="c:after">🌦 After the storm (combo)</option>';
+          gr.innerHTML = '<option value="rain">🌧 Rain</option><option value="snow">❄ Snow</option><option value="lightning">⚡ Lightning</option><option value="fog">🌫 Fog</option><option value="wind">💨 Wind</option><option value="hail">🧊 Hail</option><option value="rainbow">🌈 Rainbow</option><option value="sand">🏜 Sandstorm</option><option value="leaves">🍂 Falling leaves</option><option value="embers">🔥 Ash &amp; embers</option><option value="c:storm">⛈ Thunderstorm (combo)</option><option value="c:blizzard">🌨 Blizzard (combo)</option><option value="c:after">🌦 After the storm (combo)</option>';
           sel.appendChild(gr);
         } else if (!on && gr) {
           if (sel.value === "rain") sel.selectedIndex = 0;
