@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.68</div>
+      <div id="studiover">Version 6.78</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1125,6 +1125,20 @@
       ><button class="tab" data-go="etext">✍ Text</button><button class="tab" data-go="fonts">🔤 Fonts</button><button class="tab" data-go="imagination">☁ Imagine</button><button class="tab" data-go="zipper">🤐 Zipper</button><button class="tab" data-go="rigs">🦴 Rigs</button><button class="tab" data-go="scenery">🏞 Scenery</button><button class="tab" data-go="imgedit">🖼 Image editor</button><button class="tab" data-go="polisher">🧹 Polisher</button><button class="tab" data-go="voice">🎭 Voice</button><button class="tab" data-go="extensions">🧩 Extensions</button><button class="tab" data-go="linkup">🔗 Link</button><button class="tab" data-go="settings">⚙ Settings</button><button class="tab" data-go="whatsnew">🆕 What's New</button>
     </div>
 
+    <div id="filespn" hidden>
+      <span></span>
+      <div class="pn">
+        <div class="ph">📁 Files</div>
+        <div class="lbl">Keep sounds, pictures and text here. Sounds can be added on the Audio page and played by the sound blocks. Pictures can become an asset or a background (they also show with the backgrounds in Scenery and Edit video).</div>
+        <div class="row"><label class="up">Upload files<input type="file" id="flup" multiple /></label></div>
+        <div class="row"><input type="text" id="flurl" placeholder="Paste a link to a file (https://…)" style="flex: 1" /><button id="flget" class="g">Get from link</button></div>
+        <div id="flmsg" class="lbl"></div>
+      </div>
+      <div class="pn">
+        <div class="ph">Your files</div>
+        <div id="fllist"></div>
+      </div>
+    </div>
     <div class="wrap" id="wrap" hidden>
       <div class="v v-settings" id="settings" hidden>
         <h2>⚙ Settings</h2>
@@ -1520,6 +1534,11 @@
             Tip: wear headphones if you record while the animation plays, so the mic doesn’t pick up the speakers.
           </div>
         </div>
+        <div class="pn" id="flaudpn" hidden>
+          <div class="ph">From Files</div>
+          <div class="row"><select id="flaudsel" style="flex: 1"></select><button id="flaudadd">＋ Add as a track</button></div>
+          <div class="lbl">Sounds you keep in 📁 Files. The sound blocks can play them too.</div>
+        </div>
         <div class="pn" id="sfxpn" hidden>
           <div class="ph">Sound effects (extension)</div>
           <div class="lbl">Made in code, no sound files. Tap one to add it as a track starting at this frame (drag it in the timeline to move it). Each tap makes a slightly different one.</div>
@@ -1839,6 +1858,7 @@
               <li><b>🌧 Weather</b>: adds a Weather group to Effects. <b>🌧 Rain</b> makes hand-drawn rain fall over the frames you pick, <b>❄ Snow</b> makes snowflakes drift down, and <b>⚡ Lightning</b> strikes now and then with a flash (Strength = how often, and its colour box changes the glow). <b>🌫 Fog</b> drifts across, thicker near the ground (Strength = how thick, Angle = which way it drifts, colour box = its colour). <b>💨 Wind</b> blows gusts with leaves (Angle below 0 blows left), <b>🧊 Hail</b> falls and bounces, <b>🌈 Rainbow</b> fades in (Strength = how big, Angle = where it stands), <b>🏜 Sandstorm</b> blows a sandy haze and grains across (Angle = which way, colour box = the sand), <b>🍂 Falling leaves</b> flutter down, and <b>🔥 Ash &amp; embers</b> sends glowing embers up while ash drifts down (colour box = the glow). When 💨 Wind is on, rain, snow, hail, leaves, embers and fog lean and drift with it, and a sandstorm blows harder. Combos add several at once that look good together: <b>⛈ Thunderstorm</b>, <b>🌨 Blizzard</b> and <b>🌦 After the storm</b>. Strength = how much, See-through makes it faint, Angle tilts it like wind. When it ends, what is still falling finishes falling.</li>
               <li><b>📳 Camera shake</b>: adds a Camera shake group to Effects: <b>💥 Hit shake</b> (a hard jolt that settles by the last frame), <b>🌋 Earthquake</b> and <b>🎥 Handheld</b> (a gentle drift). Strength = how hard.</li>
               <li><b>🔊 Sound effects</b>: adds a Sound effects box to Audio. Tap <b>Whoosh, Punch, Explosion, Splash, Thunder, Rain, Pop, Footstep, Ding</b> or <b>Boing</b> to add it as a track at the frame you are on. They are made in code (no sound files), each tap sounds a little different, and they go into exported videos.</li>
+              <li><b>📁 Files</b>: makes a Files slot. Upload files or get them from a link. Sounds show up on the Audio page (From Files) and in the sound blocks. Pictures can become an asset or a background, and show with the backgrounds in Scenery and Edit video. Text files are kept for blocks.</li>
               <li><b>🩸 Particles</b> (for Blocks): make particles in code (blood, gore, confetti, smoke, sparks, bubbles, tears and more, or your own), spawn them, make them fall, stop or explode.</li>
               <li><b>⬠ Hitbox</b> (for Blocks): invisible polygons made from points that particles can touch. They show in Edit video and Watch video, never in downloads. Drag the ⌖ point in Edit video to read x and y (0, 0 is the middle).</li>
             </ul>
@@ -4006,6 +4026,13 @@
           art: {},
         },
         {
+          id: "files", types: ["slot", "addon"], icon: "📁", name: "Files", color: "#2b8a3e", target: "all", cost: 0,
+          slot: { id: "files", icon: "📁", name: "Files", color: "#2b8a3e", adopt: "filespn" },
+          origin: "Made so sounds, pictures and text can come from anywhere.",
+          instr: "Makes a 📁 Files slot: upload files or get them from a link. Sounds show up on the Audio page and in the sound blocks. Pictures can become an asset or a background, and show with the backgrounds in Scenery and Edit video. Text files are kept for blocks.",
+          art: {},
+        },
+        {
           id: "sfx", types: ["addon"], icon: "🔊", name: "Sound effects", color: "#855cd6", target: "audio", cost: 0,
           origin: "Every sound is made in code: no sound files.",
           instr: "Adds a Sound effects box to Audio: 💨 Whoosh, 👊 Punch, 💥 Explosion, 💦 Splash, ⚡ Thunder, 🌧 Rain, 🫧 Pop, 👣 Footstep, 🔔 Ding and 🌀 Boing. Tap one to add it as a track at the frame you are on; each tap sounds a little different. They play in Watch video and go into exported videos and zips.",
@@ -4485,16 +4512,19 @@
          purpose. ===== */
       /* the dropdown of characters (every character rig in Rigs / the editor) */
       /* ----- sounds played by the Audio blocks ----- */
-      const bkSndList = () => AUD.map((a, i) => [String(i), a.n]);
+      /* the sound menus list the Audio page's sounds and, with the Files extension, the sounds in Files */
+      const bkSndList = () => AUD.map((a, i) => [String(i), a.n]).concat(typeof flOn === "function" && flOn() ? FILES.filter((f) => f.kind === "sound").map((f) => ["f:" + f.id, "📁 " + f.n]) : []);
       let BK_SND = []; /* sounds blocks started: { key, end } (end in AudioContext seconds; Infinity for a background) */
       let bkSndOut = null; /* while exporting: { A, dest, t0, fps, srcs } so block sounds go into the video */
       function bkSndPlay(b, x, times, bg) {
-        const a = /^\d+$/.test(String(x)) ? AUD[+x] : null;
+        const fl = /^f:/.test(String(x)) && typeof flOn === "function" && flOn() ? FILES.find((f) => "f:" + f.id === String(x)) : null,
+          a = fl ? { buf: fl.buf, vol: 1 } : /^\d+$/.test(String(x)) ? AUD[+x] : null;
+        if (fl && !fl.buf) throw new Error("that file is still loading, or is not a sound the browser can play");
         if (!a || !a.buf) throw new Error(AUD.length ? "pick a sound" : "add a sound on the Audio page first");
         const out = bkExp ? bkSndOut : null, /* only while a video is being exported */
           live = out || playing,
           A = out ? out.A : actx(),
-          key = bg ? "bg:" + AUD.indexOf(a) : b;
+          key = bg ? "bg:" + String(x) : b;
         if (live && BK_SND.some((q) => q.key === key && q.end > A.currentTime)) return ""; /* still going: don't restart it */
         A.resume();
         const fps = out ? out.fps : +$("fps").value || 8,
@@ -9917,6 +9947,233 @@
             row.appendChild(b);
           });
       }
+      /* ── Files (extension: a slot and an add-on). FILES = [{ id, n, kind: sound|picture|text|other, mime, size, u (data: URL) }],
+         kept in IndexedDB ("files"). Sounds get a decoded .buf (not saved) so Audio and the sound blocks can use them;
+         pictures become an asset or a background, and show as background cards in Scenery and Edit video. */
+      let FILES = [];
+      const flOn = () => EXI.includes("files");
+      const flKind = (m, n) =>
+        /^audio\//.test(m) || /\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(n) ? "sound" : /^image\//.test(m) || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(n) ? "picture" : /^text\/|json|xml|javascript/.test(m) || /\.(txt|json|csv|md|svg)$/i.test(n) ? "text" : "other";
+      const flSize = (b) => (b < 1024 ? b + " B" : b < 1048576 ? Math.round(b / 102.4) / 10 + " KB" : Math.round(b / 104857.6) / 10 + " MB");
+      const flSave = () => idbSet("files", FILES.map(({ buf, im, ...f }) => f)).catch(() => ($("flmsg").textContent = "Could not save your files in this browser."));
+      async function flReady(f) {
+        if (f.kind === "sound" && !f.buf)
+          try {
+            f.buf = await actx().decodeAudioData(u2ab(f.u));
+          } catch (e) {
+            f.bad = true;
+          }
+        if (f.kind === "picture" && !f.im)
+          try {
+            f.im = await img2cv(f.u);
+          } catch (e) {
+            f.bad = true;
+          }
+      }
+      async function flAdd(name, blob) {
+        if (blob.size > 25 * 1048576) throw new Error(name + " is bigger than 25 MB");
+        const u = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = rej;
+            fr.readAsDataURL(blob);
+          }),
+          mime = blob.type || "",
+          f = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), n: name, kind: flKind(mime, name), mime, size: blob.size, u };
+        await flReady(f);
+        FILES.push(f);
+        await flSave();
+        flRefresh();
+        return f;
+      }
+      /* everything that shows files follows the list */
+      function flRefresh() {
+        if ($("fllist")) flList();
+        flAudUi();
+        flBgCards();
+        if (typeof ptMenus === "function") ptMenus();
+      }
+      function flList() {
+        const L = $("fllist");
+        L.innerHTML = "";
+        if (!FILES.length) {
+          L.innerHTML = '<div class="lbl">No files yet. Upload some, or get one from a link.</div>';
+          return;
+        }
+        FILES.forEach((f) => {
+          const row = document.createElement("div"),
+            info = document.createElement("div"),
+            acts = document.createElement("div");
+          row.className = "row";
+          row.style.cssText = "align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #ffffff14";
+          info.style.cssText = "flex:1;min-width:0";
+          const ic = { sound: "🔊", picture: "🖼", text: "📄", other: "📦" }[f.kind];
+          if (f.kind === "picture") {
+            const im = document.createElement("img");
+            im.src = f.u;
+            im.style.cssText = "width:56px;height:42px;object-fit:cover;border-radius:6px;background:#0003";
+            row.appendChild(im);
+          }
+          info.innerHTML = "<b></b><div class=\"lbl\"></div>";
+          info.firstChild.textContent = ic + " " + f.n;
+          info.lastChild.textContent = f.kind + " · " + flSize(f.size) + (f.bad ? " · the browser can't open this one" : "");
+          if (f.kind === "text") {
+            const pre = document.createElement("div");
+            pre.className = "lbl";
+            pre.style.cssText = "white-space:pre-wrap;max-height:3.6em;overflow:hidden;opacity:.8";
+            try {
+              pre.textContent = decodeURIComponent(escape(atob(f.u.split(",")[1] || ""))).slice(0, 300);
+            } catch (e) {
+              pre.textContent = "";
+            }
+            info.appendChild(pre);
+          }
+          const btn = (t, fn) => {
+            const b = document.createElement("button");
+            b.textContent = t;
+            b.onclick = fn;
+            acts.appendChild(b);
+          };
+          if (f.kind === "sound" && f.buf) {
+            btn("▶ Play", () => {
+              const A = actx(),
+                s = A.createBufferSource();
+              A.resume();
+              s.buffer = f.buf;
+              s.connect(A.destination);
+              s.start();
+            });
+            btn("＋ Audio", () => flToAudio(f));
+          }
+          if (f.kind === "picture" && f.im) {
+            btn("＋ Asset", () => ($("flmsg").textContent = lkImage(f.im, f.n.replace(/\.\w+$/, ""), "asset")));
+            btn("Background", () => {
+              flApplyBg(f, "2");
+              $("flmsg").textContent = "“" + f.n + "” is now the background from frame " + (cur + 1) + " on.";
+            });
+          }
+          btn("🗑", async () => {
+            FILES = FILES.filter((q) => q !== f);
+            await flSave();
+            flRefresh();
+          });
+          acts.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+          row.append(info, acts);
+          L.appendChild(row);
+        });
+      }
+      function flToAudio(f) {
+        if (!f.buf) return;
+        AUD.push({ n: f.n, u: f.u, buf: f.buf, start: cur, vol: 1 });
+        audUi();
+        dirty = true;
+        $("flmsg").textContent = "Added “" + f.n + "” to Audio at frame " + (cur + 1) + ".";
+      }
+      /* the From Files box on the Audio page */
+      function flAudUi() {
+        const pn = $("flaudpn");
+        if (!pn) return;
+        const snd = FILES.filter((f) => f.kind === "sound" && f.buf);
+        pn.hidden = !flOn();
+        const sel = $("flaudsel");
+        sel.innerHTML = "";
+        if (!snd.length) sel.innerHTML = "<option value=''>No sounds in Files yet</option>";
+        snd.forEach((f) => {
+          const o = document.createElement("option");
+          o.value = f.id;
+          o.textContent = "📁 " + f.n;
+          sel.appendChild(o);
+        });
+        $("flaudadd").disabled = !snd.length;
+      }
+      $("flaudadd").onclick = () => {
+        const f = FILES.find((q) => q.id === $("flaudsel").value);
+        if (f) flToAudio(f);
+      };
+      /* a picture as the background (same choices as Scenery: "1" this frame, "2" this and after, "3" every frame) */
+      function flApplyBg(f, mode) {
+        if (!f.im) return;
+        const last = mode === "1" ? cur : frames.length - 1,
+          L0 = LAY[0],
+          src = mk2(CW, CH),
+          k = Math.max(CW / f.im.width, CH / f.im.height);
+        src.getContext("2d").drawImage(f.im, (CW - f.im.width * k) / 2, (CH - f.im.height * k) / 2, f.im.width * k, f.im.height * k);
+        for (let j = mode === "3" ? 0 : cur; j <= last; j++) {
+          const fr = L0.k[j];
+          if (!fr.layer) fr.layer = mk();
+          const x = fr.layer.getContext("2d");
+          x.globalCompositeOperation = "source-over";
+          x.clearRect(0, 0, fr.layer.width, fr.layer.height);
+          x.drawImage(src, 0, 0, fr.layer.width, fr.layer.height);
+          fr.v = (fr.v || 0) + 1;
+        }
+        ui();
+        dirty = true;
+      }
+      /* picture files show as background cards next to Scenery's own backgrounds */
+      function flBgCards() {
+        [
+          ["scbgs", () => ($("scwhere") ? $("scwhere").value : "2")],
+          ["scbgs2", () => ($("edbgwhere") ? $("edbgwhere").value : "2")],
+        ].forEach(([id, mode]) => {
+          const el = $(id);
+          if (!el) return;
+          el.querySelectorAll(".flbg").forEach((n) => n.remove());
+          if (!flOn()) return;
+          FILES.filter((f) => f.kind === "picture" && f.im).forEach((f) => {
+            const b = document.createElement("button"),
+              im = document.createElement("img"),
+              sp = document.createElement("span");
+            b.className = "card flbg";
+            b.style.flex = "0 0 100px";
+            im.src = f.u;
+            im.style.cssText = "width:84px;height:48px;object-fit:cover";
+            sp.textContent = "📁 " + f.n.replace(/\.\w+$/, "");
+            b.append(im, sp);
+            b.onclick = () => {
+              flApplyBg(f, mode());
+              if (typeof scm === "function") scm("“" + f.n + "” is now the background. It's on your Background layer.");
+            };
+            el.appendChild(b);
+          });
+        });
+      }
+      $("flup").onchange = async (e) => {
+        const list = [...e.target.files];
+        e.target.value = "";
+        for (const b of list)
+          try {
+            await flAdd(b.name, b);
+            $("flmsg").textContent = "Added “" + b.name + "”.";
+          } catch (err) {
+            $("flmsg").textContent = "Couldn’t add it: " + ((err && err.message) || err) + ".";
+          }
+      };
+      $("flget").onclick = async () => {
+        const url = $("flurl").value.trim();
+        if (!url) return ($("flmsg").textContent = "Paste a link first.");
+        $("flmsg").textContent = "Getting it…";
+        try {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error("the site said " + r.status);
+          const b = await r.blob(),
+            nm = decodeURIComponent((url.split("?")[0].split("/").pop() || "file").trim()) || "file";
+          await flAdd(nm, b);
+          $("flurl").value = "";
+          $("flmsg").textContent = "Added “" + nm + "”.";
+        } catch (e) {
+          $("flmsg").textContent = "Couldn’t get it (" + ((e && e.message) || e) + "). Some sites don’t let other pages download their files: download it and use Upload files instead.";
+        }
+      };
+      (async () => {
+        try {
+          FILES = (await idbGet("files")) || [];
+        } catch (e) {
+          FILES = [];
+        }
+        for (const f of FILES) await flReady(f);
+        flRefresh();
+      })();
       async function loadAudio(list) {
         const out = [];
         for (const a of list) {
@@ -11278,6 +11535,7 @@
           fxWeatherUi();
           fxShakeUi();
           sfxUi();
+          flRefresh();
         };
       }
       /* weather combos: several weathers at once, tuned to look good together. They are added as normal effects,
@@ -16225,17 +16483,20 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         if (scBuilt) return;
         scBuilt = true;
         scBuild($("scbgs"), $("scprops"), () => $("scwhere").value, () => $("scplace").checked);
+        flBgCards();
       }
       function scTray() {
         if (scBuilt2) return;
         scBuilt2 = true;
         scBuild($("scbgs2"), $("scprops2"), () => $("edbgwhere").value, () => true);
+        flBgCards();
       }
       const _goRS = go;
       go = function (v) {
         _goRS(v);
         if (v === "rigs") rgEnter();
         if (v === "scenery") scEnter();
+        if (v === "files" || v === "scenery" || v === "edit" || v === "audio") flRefresh();
       };
     
       /* ===== Body parts: add a tail, ears, wings, a hat or your own drawing to any character ===== */
