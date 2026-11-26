@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.15</div>
+      <div id="studiover">Version 7.16</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -9935,8 +9935,23 @@
         const t = vidLenText();
         document.querySelectorAll(".vlen").forEach((e) => (e.textContent = t));
       }
+      /* the length shows on every editor page too (Joel's list), at the top of the page's first panel */
+      const VLEN_VIEWS = ["zipper", "etext", "watch", "camera", "edit", "naming", "audio", "scenery", "effects", "menucust", "export"];
+      VLEN_VIEWS.forEach((v) => {
+        const box = document.querySelector(".v-" + v);
+        if (!box || box.querySelector(".vlen")) return;
+        const d = document.createElement("div"),
+          pn = box.querySelector(".pn");
+        d.className = "lbl vlen";
+        d.style.margin = "0 0 6px";
+        if (v === "edit" && $("onion")) $("onion").closest(".row").after(d); /* Edit video: under the play row of the timeline */
+        else if (pn) {
+          const ph = pn.querySelector(".ph");
+          ph && ph.parentNode === pn ? ph.after(d) : pn.prepend(d);
+        } else box.prepend(d);
+      });
       setInterval(() => {
-        if (view === "export" || view === "zipper") vidLenUi();
+        if (VLEN_VIEWS.includes(view)) vidLenUi();
       }, 500);
       /* Video export entry point:
          1. any audio tracks -> record with sound (exportAV)
