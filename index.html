@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.16</div>
+      <div id="studiover">Version 7.17</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -9922,14 +9922,14 @@
       }
       /* how long the video will be, shown next to the download buttons (Export and Zipper) */
       function vidLenText() {
+        /* always hours:minutes:seconds.milliseconds (Joel's choice), like 0:01:01.667 */
         const fps = +$("fps").value || 8,
-          s = frames.length / fps,
-          m = Math.floor(s / 60),
-          h = Math.floor(m / 60),
-          sec = s - m * 60,
-          ss = (Math.round(sec * 10) / 10).toFixed(sec % 1 ? 1 : 0);
-        const t = h ? h + ":" + String(m % 60).padStart(2, "0") + ":" + ss.padStart(2, "0") : m + ":" + ss.padStart(ss.includes(".") ? 4 : 2, "0");
-        return "🎞 Video length: " + t + " (" + Math.round(s * 10) / 10 + " seconds · " + frames.length + " frame" + (frames.length === 1 ? "" : "s") + " at " + fps + " FPS)";
+          ms = Math.round((frames.length / fps) * 1000),
+          H = Math.floor(ms / 3600000),
+          M = Math.floor((ms % 3600000) / 60000),
+          S = Math.floor((ms % 60000) / 1000),
+          t = H + ":" + String(M).padStart(2, "0") + ":" + String(S).padStart(2, "0") + "." + String(ms % 1000).padStart(3, "0");
+        return "🎞 Video length: " + t + " (" + frames.length + " frame" + (frames.length === 1 ? "" : "s") + " at " + fps + " FPS)";
       }
       function vidLenUi() {
         const t = vidLenText();
