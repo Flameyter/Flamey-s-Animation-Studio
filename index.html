@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.33</div>
+      <div id="studiover">Version 6.34</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -5069,7 +5069,11 @@
       }
       /* the particle menus in the Blocks editor follow the saved particles */
       function ptMenus() {
-        if (typeof bkRender === "function" && !bkExp && document.querySelector(".bkpanel")) setTimeout(() => !bkExp && bkRender(), 0);
+        if (typeof bkRender === "function" && !bkExp && document.querySelector(".bkpanel")) setTimeout(() => {
+            if (bkExp) return;
+            bkRender();
+            if (typeof bkFlyUi === "function") bkFlyUi(); /* the tray's menus too */
+          }, 0);
       }
       let ptSpawnN = 0;
       const ptBright = (p, db) => (db ? Object.assign({}, p, { brightness: ptN(p, "brightness", 0) + db }) : p);
@@ -5161,6 +5165,10 @@
       const ptOn = () => EXI.includes("blocks") && EXI.includes("particles");
       function ptCatSync() {
         const on = ptOn();
+        if (typeof bkRender === "function" && document.querySelector(".bkpanel")) setTimeout(() => {
+          bkRender();
+          if (typeof bkFlyUi === "function") bkFlyUi();
+        }, 0);
         document.querySelectorAll('.bkcatb[data-c="particles"]').forEach((b) => (b.style.display = on ? "" : "none"));
         document.querySelectorAll('.bkcatb[data-c="hitbox"]').forEach((b) => (b.style.display = hbOn() ? "" : "none"));
         if (typeof bkCat !== "undefined" && ((!on && bkCat === "particles") || (!hbOn() && bkCat === "hitbox"))) {
@@ -5569,7 +5577,7 @@
           ptMenus();
           return "deleted";
         } },
-        pthitbox: { cat: "particles", shape: "bool", tpl: "touching hitbox %1", a: [["menu", "", () => (hbOn() ? hbList() : []), "hitbox extension not available at this moment"]], run: (v) => {
+        pthitbox: { cat: "particles", shape: "bool", tpl: "touching hitbox %1", a: [["menu", "", () => (hbOn() ? hbList() : []), () => (hbOn() ? (hbList().length ? "no selected hitbox" : "no hitboxes yet") : "hitbox extension not available at this moment")]], run: (v) => {
           if (!hbOn()) return false;
           const id = PT_CUR || PT_LAST,
             s = PTS[id],
@@ -6738,7 +6746,7 @@
         let el;
         if (def[0] === "menu") {
           el = document.createElement("select");
-          const opts = typeof def[2] === "function" ? [["", def[3] || "pick…"]].concat(def[2]()) : def[2]; /* def[3]: what an empty menu says */
+          const opts = typeof def[2] === "function" ? [["", (typeof def[3] === "function" ? def[3]() : def[3]) || "pick…"]].concat(def[2]()) : def[2]; /* def[3]: what an empty menu says */
           opts.forEach(([k, l]) => {
             const o = document.createElement("option");
             o.value = k;
