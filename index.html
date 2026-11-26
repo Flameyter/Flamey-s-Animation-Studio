@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.46</div>
+      <div id="studiover">Version 6.47</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -4911,13 +4911,13 @@
          localStorage oss_particles) so it shows in the menus as part 1, part 2 … Where each one is on screen (PTS)
          and the babies of an explosion (PTB) are not saved: they start fresh at frame 1 and when a video is exported.
          In the blocks 0,0 is the middle of the stage and y goes up; PTS keeps canvas pixels. */
-      const PT_KEYS = ["id", "color", "brightness", "saturation", "size", "poly sides", "width", "height", "transparency", "angle", "strips", "curve", "warp", "fall speed", "gravity"];
+      const PT_KEYS = ["id", "color", "brightness", "saturation", "size", "poly sides", "ratio", "transparency", "angle", "strips", "curve", "warp", "fall speed", "gravity"];
       const PT_PRE = {
-        blood: { color: "#8a0303", size: 7, "poly sides": 0, width: 80, height: 120, curve: 60, warp: 25, strips: 1, "fall speed": 10, gravity: 2 },
-        gore: { color: "#5c0a0a", size: 13, "poly sides": 6, width: 110, height: 90, curve: 35, warp: 70, strips: 1, "fall speed": 12, gravity: 3 },
-        confetti: { color: "#ffcc00", size: 8, "poly sides": 4, width: 160, height: 70, angle: 30, strips: 1, "fall speed": 3, gravity: 0.3 },
-        "water drop": { color: "#3fa9ff", brightness: 10, transparency: 30, size: 7, "poly sides": 0, width: 80, height: 130, curve: 50, strips: 1, "fall speed": 10, gravity: 2 },
-        sparks: { color: "#ffc93c", brightness: 20, size: 5, "poly sides": 4, width: 35, height: 170, strips: 3, "fall speed": 6, gravity: 1 },
+        blood: { color: "#8a0303", size: 7, "poly sides": 0, ratio: "2:3", curve: 60, warp: 25, strips: 1, "fall speed": 10, gravity: 2 },
+        gore: { color: "#5c0a0a", size: 13, "poly sides": 6, ratio: "11:9", curve: 35, warp: 70, strips: 1, "fall speed": 12, gravity: 3 },
+        confetti: { color: "#ffcc00", size: 8, "poly sides": 4, ratio: "16:7", angle: 30, strips: 1, "fall speed": 3, gravity: 0.3 },
+        "water drop": { color: "#3fa9ff", brightness: 10, transparency: 30, size: 7, "poly sides": 0, ratio: "8:13", curve: 50, strips: 1, "fall speed": 10, gravity: 2 },
+        sparks: { color: "#ffc93c", brightness: 20, size: 5, "poly sides": 4, ratio: "1:5", strips: 3, "fall speed": 6, gravity: 1 },
         dust: { color: "#b9a78f", transparency: 55, size: 9, "poly sides": 0, warp: 45, strips: 1, "fall speed": 1, gravity: 0.1 },
         rubble: { color: "#7a7166", size: 11, "poly sides": 5, warp: 55, curve: 15, strips: 1, "fall speed": 14, gravity: 4 },
       };
@@ -4950,6 +4950,15 @@
       function ptRng(seed) {
         let q = seed >>> 0 || 1;
         return () => ((q = (q * 1664525 + 1013904223) >>> 0), q / 4294967296);
+      }
+      /* how wide and tall the shape is, from the ratio (the longer side is 1); old particles may still have width / height */
+      function ptWH(p) {
+        if (p.ratio == null && (p.width != null || p.height != null)) return [ptN(p, "width", 100) / 100, ptN(p, "height", 100) / 100];
+        const m = /^\s*(-?[\d.]+)\s*:\s*(-?[\d.]+)\s*$/.exec(String(p.ratio == null ? "" : p.ratio)),
+          a = m ? Math.max(0.01, Math.abs(+m[1])) : 1,
+          b = m ? Math.max(0.01, Math.abs(+m[2])) : 1,
+          M = Math.max(a, b);
+        return [a / M, b / M];
       }
       function ptSettings(v) {
         const p = {};
@@ -4988,8 +4997,7 @@
       function ptPath(p, seed) {
         const r = Math.max(1, ptN(p, "size", 10)),
           n = Math.round(ptN(p, "poly sides", 4)),
-          sx = ptN(p, "width", 100) / 100,
-          sy = ptN(p, "height", 100) / 100,
+          [sx, sy] = ptWH(p),
           warp = ptClamp(ptN(p, "warp", 0), 0, 100) / 100,
           round = n < 3,
           N = round ? 24 : Math.min(n, 40),
@@ -5013,9 +5021,9 @@
         return d + " Z";
       }
       const ptStrips = (p) => ptClamp(Math.round(ptN(p, "strips", 1)), 1, 12);
-      const ptGap = (p) => Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100 * 0.9;
+      const ptGap = (p) => Math.max(1, ptN(p, "size", 10)) * ptWH(p)[1] * 0.9;
       function ptSvg(p) {
-        const r = Math.max(1, ptN(p, "size", 10)) * Math.max(1, ptN(p, "width", 100) / 100, ptN(p, "height", 100) / 100) * 1.7,
+        const r = Math.max(1, ptN(p, "size", 10)) * Math.max(1, ...ptWH(p)) * 1.7,
           ns = ptStrips(p),
           gap = ptGap(p),
           W = Math.ceil(r * 2),
@@ -5110,7 +5118,7 @@
           if (!p || !s.shown || !s.falling) continue;
           s.y += ptN(p, "fall speed", 6) + s.vy;
           s.vy += ptN(p, "gravity", 1);
-          const floor = G - Math.max(1, ptN(p, "size", 10)) * ptN(p, "height", 100) / 100 * (s.k || 1);
+          const floor = G - Math.max(1, ptN(p, "size", 10)) * ptWH(p)[1] * (s.k || 1);
           if (s.y >= floor) {
             s.y = floor;
             s.vy = 0;
@@ -5200,7 +5208,7 @@
             try {
               const m = x.getTransform(),
                 c = m.transformPoint(new DOMPoint(s.x, s.y)),
-                rr = Math.max(2, Math.max(1, ptN(p, "size", 10)) * Math.max(ptN(p, "width", 100), ptN(p, "height", 100)) / 100 * Math.hypot(m.a, m.b)),
+                rr = Math.max(2, Math.max(1, ptN(p, "size", 10)) * Math.max(...ptWH(p)) * Math.hypot(m.a, m.b)),
                 x0 = Math.max(0, Math.floor(c.x - rr)),
                 y0 = Math.max(0, Math.floor(c.y - rr)),
                 w = Math.min(x.canvas.width, Math.ceil(c.x + rr)) - x0,
@@ -5681,7 +5689,10 @@
            A character that is not on that frame also reports 0. */
         /* Particles (drawn in code; see ptSvg and ptDraw) */
         ptimpl: { cat: "particles", shape: "rep", tpl: "implement %1", a: [["str", ""]], run: (v) => ptRaw(v[0]) },
-        ptmake: { cat: "particles", shape: "rep", tpl: "particle maker: id %1 color %2 brightness %3 saturation %4 size %5 poly sides %6 width %7 height %8 transparency %9 angle %10 strips %11 curve %12 warp %13 fall speed %14 gravity %15", a: [["str", ""], ["str", "2"], ["num", 0], ["num", 0], ["num", 10], ["num", 4], ["num", 90], ["num", 90], ["num", 0], ["num", 0], ["num", 1], ["num", ""], ["num", ""], ["num", ""], ["num", ""]], run: (v) => ptShow(ptSettings(v)) },
+        ptmake: { cat: "particles", shape: "rep", tpl: "particle maker: id %1 color %2 brightness %3 saturation %4 size %5 poly sides %6 ratio %7 : %8 transparency %9 angle %10 strips %11 curve %12 warp %13 fall speed %14 gravity %15", a: [["str", ""], ["str", "2"], ["num", 0], ["num", 0], ["num", 10], ["num", 4], ["num", 1], ["num", 1], ["num", 0], ["num", 0], ["num", 1], ["num", ""], ["num", ""], ["num", ""], ["num", ""]], run: (v) => {
+          const r = (q) => (q === "" || q == null || isNaN(+q) || +q <= 0 ? 1 : +q);
+          return ptShow(ptSettings(v.slice(0, 6).concat([r(v[6]) + ":" + r(v[7])], v.slice(8))));
+        } },
         ptspawn: { cat: "particles", shape: "cmd", tpl: "spawn at x: %1 y: %2", a: [["num", ""], ["num", ""]], run: (v) => {
           const id = PT_CUR && ptGet(PT_CUR) ? PT_CUR : PT_LAST && ptGet(PT_LAST) ? PT_LAST : PT.length ? PT[PT.length - 1].id : "";
           if (!id) return "no particle added yet";
@@ -5750,7 +5761,7 @@
         } },
         ptpreset: { cat: "particles", shape: "rep", tpl: "preset %1", a: [["menu", "blood", Object.keys(PT_PRE).map((k) => [k, k])]], run: (v) => {
           const o = PT_PRE[v[0]] || PT_PRE.blood;
-          const p = ptSettings(PT_KEYS.map((k) => (k === "id" ? (PT_PRE[v[0]] ? v[0] : "blood") : o[k] != null ? o[k] : k === "width" || k === "height" ? 100 : k === "strips" ? 1 : 0)));
+          const p = ptSettings(PT_KEYS.map((k) => (k === "id" ? (PT_PRE[v[0]] ? v[0] : "blood") : o[k] != null ? o[k] : k === "ratio" ? "1:1" : k === "strips" ? 1 : 0)));
           p.vary = 1; /* each one that spawns gets its own size and brightness */
           return ptShow(p);
         } },
