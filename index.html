@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.89</div>
+      <div id="studiover">Version 6.90</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -7520,8 +7520,26 @@
           setPlay(true);
         };
         stp.onclick = () => setPlay(false);
+        /* the scripts as scratchblocks text: download it, or copy it to paste into scratchblocks */
+        const sbDl = mk("button", "", "⬇ Download scripts.txt"),
+          sbCp = mk("button", "", "📋 Copy as scratchblocks");
+        sbDl.onclick = () => {
+          if (!BKS.length) return bkAdd("There are no scripts yet.");
+          save((PNAME.trim() || "scripts").replace(/[\\/:*?"<>|]+/g, "_") + " scripts.txt", new Blob([bkScratchText()], { type: "text/plain" }));
+          bkAdd("Downloaded your scripts as scratchblocks text.");
+        };
+        sbCp.onclick = async () => {
+          if (!BKS.length) return bkAdd("There are no scripts yet.");
+          const t = bkScratchText();
+          try {
+            await navigator.clipboard.writeText(t);
+            bkAdd("Copied. Paste it into scratchblocks to see your blocks.");
+          } catch (e) {
+            showText(new Blob([t], { type: "text/plain" }));
+          }
+        };
         const bar = mk("div", "row");
-        bar.append(ful, flag, stp, clr, und, red, shw);
+        bar.append(ful, flag, stp, clr, und, red, shw, sbDl, sbCp);
         p2.append(mk("div", "ph", "Workspace"), ed, bar, mk("div", "lbl", "What the scripts did"), bkLog);
         v.append(p1, p2);
         bkRender();
@@ -13597,7 +13615,11 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         };
         BKS.forEach((S, i) => {
           if (i) out.push("");
-          S.b.forEach((b) => line(b, 0));
+          try {
+            (S.b || []).forEach((b) => line(b, 0));
+          } catch (e) {
+            out.push("// this script could not be written out (" + ((e && e.message) || e) + ")");
+          }
         });
         return out.join("\n") + "\n";
       }

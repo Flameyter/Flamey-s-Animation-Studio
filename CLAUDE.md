@@ -8,7 +8,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - Joel's YouTube channel: **Flamey :)**, https://www.youtube.com/@CrazyPWAF (about 2.65K subscribers). Videos made in the studio go here.
 
 ## Version
-- The version is shown at the bottom of the main menu (`#studiover`, "Version 6.89"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
+- The version is shown at the bottom of the main menu (`#studiover`, "Version 6.90"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
 
 ## Checking your work
 - Syntax: pull the inline scripts out into one file and run `node --check` on it.
@@ -48,7 +48,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - Speed check (v6.68): one frame with all 22 effects ≈ 28 ms, Edit video 60 fps, 1000 frames: changing frame ≈ 30 ms, saving ≈ 5 ms. Projects save to IndexedDB, not localStorage.
 - No physics or ragdoll blocks (Joel does that himself): the old `make () able to handle physics` block and the planned `if bounce, play sound` were dropped.
 - The Looks blocks `display () at x: () y: ()` and `sticker () at x: () y: ()` were removed (they place assets, which Joel does himself).
-- Zipper folders: `files/` (everything in Files, with that extension) and `blocks/` (with Blocks): `scripts.txt` = every script as scratchblocks text with `:: hat`/`:: reporter` and the category colour (`bkScratchText`, paste into scratchblocks to see them), `blocks.json` (scripts + variables), `particles.json`, `hitboxes.json`.
+- Zipper folders: `files/` (everything in Files, with that extension) and `blocks/` (with Blocks): `scripts.txt` = every script as scratchblocks text with `:: hat`/`:: reporter` and the category colour (`bkScratchText`, paste into scratchblocks to see them), `blocks.json` (scripts + variables), `particles.json`, `hitboxes.json`. The Blocks page also has ⬇ Download scripts.txt and 📋 Copy as scratchblocks buttons (same `bkScratchText`).
 - The Zipper no longer loads frames (it was slow); the Upgrades "frames eaten" counter no longer counts for new zips.
 
 ## Defaults I guessed that Joel never answered
