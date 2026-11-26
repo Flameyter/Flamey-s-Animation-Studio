@@ -1116,7 +1116,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.27</div>
+      <div id="studiover">Version 7.28</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -3111,15 +3111,33 @@
         } catch (e) {}
         cells();
       }
-      function cells() {
+      /* the Edit video timeline. Only the frames that can be seen (and some on each side) are drawn, with empty space for the
+         rest, so even tens of thousands of frames stay fast; scrolling draws the new ones. */
+      let tlWin = [0, 0];
+      function cells(fromScroll) {
         const el = $("cells"),
-          keep = el.scrollLeft;
-        el.innerHTML = "";
+          keep = el.scrollLeft,
+          N = frames.length;
         el.style.setProperty("--tlw", TLW + "px");
         el.classList.toggle("tlsmall", TLW < 13 && TLW > 3);
         el.classList.toggle("tltiny", TLW <= 3);
         if ($("tlzv")) $("tlzv").textContent = Math.round((TLW / 26) * 100) + "%";
         const every = TLW >= 26 ? 5 : TLW >= 13 ? 10 : TLW >= 6 ? 25 : 100; /* which frame numbers fit */
+        /* where to scroll: keep the frame you're on in view (unless this redraw came from scrolling) */
+        const vw = Math.max(200, el.clientWidth || 800),
+          x = 96 + cur * TLW;
+        let sl = fromScroll ? keep : x < keep + 96 || x > keep + vw - TLW ? x - vw / 2 : keep;
+        sl = Math.max(0, Math.min(sl, 96 + N * TLW - vw));
+        const a = Math.max(0, Math.floor(sl / TLW) - 60),
+          b = Math.min(N, a + Math.ceil(vw / TLW) + 120);
+        tlWin = [a, b];
+        el.innerHTML = "";
+        const gap = (r, w) => {
+          if (w <= 0) return;
+          const s = document.createElement("div");
+          s.style.cssText = "flex:none;width:" + w + "px";
+          r.appendChild(s);
+        };
         const row = (label, cls, on) => {
           const r = document.createElement("div");
           r.className = "trow " + (cls || "");
@@ -3132,13 +3150,16 @@
         };
         /* frame numbers */
         const nr = row("Frame", "tnum");
-        frames.forEach((f, i) => {
-          const d = document.createElement("div");
+        gap(nr, a * TLW);
+        for (let i = a; i < b; i++) {
+          const f = frames[i],
+            d = document.createElement("div");
           d.className = "cell" + (i === cur ? " cur" : "") + (f.tw ? " tw" : "");
           d.innerHTML = "<span>" + ((i + 1) % every === 0 || i === 0 ? i + 1 : "") + "</span>";
           d.onclick = () => nav(i);
           nr.appendChild(d);
-        });
+        }
+        gap(nr, (N - b) * TLW);
         /* layers */
         for (let li = LAY.length - 1; li >= 0; li--) {
           const L = LAY[li],
@@ -3150,8 +3171,11 @@
             layUi();
             ui();
           };
-          (L.k || []).forEach((f, i) => {
-            const d = document.createElement("div");
+          const K = L.k || [];
+          gap(r, Math.min(a, K.length) * TLW);
+          for (let i = a; i < Math.min(b, K.length); i++) {
+            const f = K[i],
+              d = document.createElement("div");
             d.className = "cell" + (i === cur ? " cur" : "") + (f.items.length || f.texts.length || f.layer ? " has" : "");
             d.innerHTML = "<i></i>";
             d.onclick = () => {
@@ -3164,29 +3188,44 @@
               ui();
             };
             r.appendChild(d);
-          });
+          }
+          gap(r, (K.length - Math.max(a, Math.min(b, K.length))) * TLW);
         }
         /* sounds */
         const fps = +$("fps").value || 8;
-        AUD.forEach((a) => {
-          if (!a.buf) return;
-          const r = row("🔊 " + a.n, "tsnd"),
+        AUD.forEach((a2) => {
+          if (!a2.buf) return;
+          const r = row("🔊 " + a2.n, "tsnd"),
             lane = document.createElement("div");
           lane.className = "tlane";
-          lane.style.width = frames.length * TLW + "px";
-          const len = a.end == null ? a.buf.duration * fps : a.end + 1 - a.start,
-            b = document.createElement("div");
-          b.className = "tbar";
-          b.style.left = a.start * TLW + "px";
-          b.style.width = Math.max(8, len * TLW) + "px";
-          b.title = a.n + ": starts at frame " + (Math.round(a.start) + 1) + ". Move it on the Audio page.";
-          b.onclick = () => nav(Math.round(a.start));
-          lane.appendChild(b);
+          lane.style.width = N * TLW + "px";
+          const len = a2.end == null ? a2.buf.duration * fps : a2.end + 1 - a2.start,
+            bar = document.createElement("div");
+          bar.className = "tbar";
+          bar.style.left = a2.start * TLW + "px";
+          bar.style.width = Math.max(8, len * TLW) + "px";
+          bar.title = a2.n + ": starts at frame " + (Math.round(a2.start) + 1) + ". Move it on the Audio page.";
+          bar.onclick = () => nav(Math.round(a2.start));
+          lane.appendChild(bar);
           r.appendChild(lane);
         });
-        /* keep the frame you're on in view */
-        const x = 96 + cur * TLW;
-        el.scrollLeft = x < keep + 96 || x > keep + el.clientWidth - TLW ? x - el.clientWidth / 2 : keep;
+        el.scrollLeft = sl;
+      }
+      /* scrolling past what is drawn draws the new frames */
+      {
+        let pend = false;
+        $("cells").addEventListener("scroll", () => {
+          if (pend) return;
+          const el = $("cells"),
+            first = Math.floor(el.scrollLeft / TLW),
+            last = first + Math.ceil(el.clientWidth / TLW);
+          if (first >= tlWin[0] && last <= tlWin[1]) return;
+          pend = true;
+          requestAnimationFrame(() => {
+            pend = false;
+            cells(true);
+          });
+        });
       }
       $("tlzo").onclick = () => tlZoom(-1);
       $("tlzi").onclick = () => tlZoom(1);
