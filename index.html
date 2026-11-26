@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.42</div>
+      <div id="studiover">Version 6.43</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2978,7 +2978,7 @@
             f0.texts = keepT;
           }
         });
-        if (!raw) ptDraw(x); /* Blocks: particles */
+        if (!raw || x === g) ptDraw(x); /* Blocks: particles (Edit video shows them too) */
         if (x === g || x === wg) hbDraw(x); /* Blocks: hitboxes show in Edit video and Watch video only, never in a downloaded video */
         if (on && i > 0) drawFrame(x, frames[i - 1], 0.3);
         x.restore();
@@ -5075,12 +5075,20 @@
       }
       let ptSpawnN = 0;
       const ptBright = (p, db) => (db ? Object.assign({}, p, { brightness: ptN(p, "brightness", 0) + db }) : p);
+      /* starting over: particles placed by tapping blocks (not by a playing script) go back to where they were put;
+         the rest are cleared, and their scripts make them again */
       function ptReset() {
         ptSpawnN = 0;
         if (typeof HBG !== "undefined") HBG = {};
-        PTS = {};
+        const keep = {};
+        for (const id in PTS) {
+          const s = PTS[id];
+          if (s.home && ptGet(id)) keep[id] = Object.assign({}, s, { x: s.home.x, y: s.home.y, vy: 0, shown: true, falling: s.home.falling });
+        }
+        PTS = keep;
         PTB = [];
       }
+      const ptLive = () => playing || !!bkExp; /* is a script running the video right now? */
       /* one frame of falling: fall speed every frame, plus gravity that keeps adding up; it stops on the ground */
       /* the ground is the bottom of what the camera shows on that frame (the whole picture when there is no camera) */
       function ptGround(n) {
@@ -5584,7 +5592,8 @@
           const old = PTS[id];
           /* spawning again at the same spot while it is still out leaves it be (so a frame hat that fires again does not snap it back) */
           if (old && old.shown && old.sx === bkNum(v[0]) && old.sy === bkNum(v[1])) return "";
-          PTS[id] = { sx: bkNum(v[0]), sy: bkNum(v[1]), x: CW / 2 + bkNum(v[0]), y: CH / 2 - bkNum(v[1]), /* 0,0 is the middle, y goes up */ vy: 0, shown: true, falling: false, k: p && p.vary ? 0.7 + R() * 0.6 : 1, db: p && p.vary ? Math.round((R() * 2 - 1) * 25) : 0 };
+          PTS[id] = { sx: bkNum(v[0]), sy: bkNum(v[1]), x: CW / 2 + bkNum(v[0]), y: CH / 2 - bkNum(v[1]), /* 0,0 is the middle, y goes up */
+            home: ptLive() ? null : { x: CW / 2 + bkNum(v[0]), y: CH / 2 - bkNum(v[1]), falling: false }, /* placed by tapping: kept when play starts */ vy: 0, shown: true, falling: false, k: p && p.vary ? 0.7 + R() * 0.6 : 1, db: p && p.vary ? Math.round((R() * 2 - 1) * 25) : 0 };
           if (!playing && !bkExp && typeof ui === "function") ui();
           return "";
         } },
@@ -5610,7 +5619,10 @@
         } },
         ptfall: { cat: "particles", shape: "cmd", tpl: "fall with particle %1 each frame with its fall speed", a: [["menu", "", ptList, "no selected particle"]], run: (v) => {
           const s = ptState(v[0]);
-          if (s && s.shown) s.falling = true;
+          if (s && s.shown) {
+            s.falling = true;
+            if (s.home && !ptLive()) s.home.falling = true;
+          }
           return "";
         } },
         ptstop: { cat: "particles", shape: "cmd", tpl: "stop falling %1", a: [["menu", "", ptList, "no selected particle"]], run: (v) => {
@@ -5618,6 +5630,7 @@
           if (s) {
             s.falling = false;
             s.vy = 0;
+            if (s.home && !ptLive()) s.home.falling = false;
           }
           return "";
         } },
