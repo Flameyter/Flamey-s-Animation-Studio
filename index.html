@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.91</div>
+      <div id="studiover">Version 7.01</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -7538,8 +7538,18 @@
             showText(new Blob([t], { type: "text/plain" }));
           }
         };
+        const sbSvg = mk("button", "", "⬇ Download scripts.svg");
+        sbSvg.onclick = async () => {
+          if (!BKS.length) return bkAdd("There are no scripts yet.");
+          try {
+            save((PNAME.trim() || "scripts").replace(/[\\/:*?"<>|]+/g, "_") + " scripts.svg", new Blob([await bkScratchSvg()], { type: "image/svg+xml" }));
+            bkAdd("Downloaded a picture of your scripts.");
+          } catch (e) {
+            bkAdd("Couldn’t draw the picture (" + ((e && e.message) || e) + ").");
+          }
+        };
         const bar = mk("div", "row");
-        bar.append(ful, flag, stp, clr, und, red, shw, sbDl, sbCp);
+        bar.append(ful, flag, stp, clr, und, red, shw, sbDl, sbSvg, sbCp);
         p2.append(mk("div", "ph", "Workspace"), ed, bar, mk("div", "lbl", "What the scripts did"), bkLog);
         v.append(p1, p2);
         bkRender();
@@ -13626,6 +13636,31 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         });
         return out.join("\n") + "\n";
       }
+      /* the scripts as a picture: scratchblocks (the same thing Joel draws his block designs with) turns the scratchblocks
+         text into an SVG. It is loaded from the internet the first time; with no internet there is no picture. */
+      let sbLib = null;
+      function sbLoad() {
+        if (window.scratchblocks) return Promise.resolve(window.scratchblocks);
+        if (!sbLib)
+          sbLib = new Promise((res, rej) => {
+            const s = document.createElement("script");
+            s.src = "https://cdn.jsdelivr.net/npm/scratchblocks@3.6.4/build/scratchblocks.min.js";
+            s.onload = () => (window.scratchblocks ? res(window.scratchblocks) : rej(new Error("scratchblocks did not load")));
+            s.onerror = () => {
+              sbLib = null;
+              rej(new Error("needs the internet"));
+            };
+            document.head.appendChild(s);
+          });
+        return sbLib;
+      }
+      async function bkScratchSvg() {
+        const sb = await sbLoad(),
+          doc = sb.parse(bkScratchText(), { languages: ["en"] }),
+          view = sb.newView(doc, { style: "scratch3", scale: 0.675 });
+        view.render();
+        return view.exportSVGString();
+      }
       $("zgo").onclick = async () => {
         const files = [],
           enc = new TextEncoder(),
@@ -13721,6 +13756,12 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           /* blocks/: the scripts as scratchblocks text and as block code, plus particles and hitboxes */
           if (EXI.includes("blocks") && BKS.length) {
             files.push({ name: uniq("blocks/", "scripts", ".txt"), data: enc.encode(bkScratchText()) });
+            try {
+              say("Drawing your blocks…");
+              files.push({ name: uniq("blocks/", "scripts", ".svg"), data: enc.encode(await bkScratchSvg()) });
+            } catch (e) {
+              extra.push("Blocks picture: not made (" + ((e && e.message) || e) + "). blocks/scripts.txt is still there.");
+            }
             files.push({ name: uniq("blocks/", "blocks", ".json"), data: enc.encode(JSON.stringify({ scripts: BKS.map((S) => ({ x: S.x, y: S.y, b: S.b })), variables: typeof BKVAR !== "undefined" ? BKVAR : {} }, null, 2)) });
           }
           if (EXI.includes("blocks") && typeof ptOn === "function" && ptOn() && PT.length) files.push({ name: uniq("blocks/", "particles", ".json"), data: enc.encode(JSON.stringify(PT, null, 2)) });
@@ -13758,6 +13799,58 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           $("zgo").disabled = false;
         }
       };
+      /* puts a Zipper zip back: the project, and (when their extensions are on) files/, blocks/, particles and hitboxes */
+      async function zipOpenAll(list) {
+        const dec = new TextDecoder(),
+          get = (n) => list.find((x) => x.name === n),
+          txt = async (x) => dec.decode(await x.bytes()),
+          said = [];
+        await load(JSON.parse(await txt(get("project.json"))));
+        said.push("project");
+        const fl = list.filter((x) => x.name.startsWith("files/"));
+        if (fl.length) {
+          if (typeof flOn === "function" && flOn()) {
+            let n = 0;
+            for (const x of fl) {
+              const nm = x.name.slice(6);
+              if (FILES.some((f) => f.n === nm)) continue; /* already there */
+              const ext = (/\.(\w+)$/.exec(nm) || [])[1] || "",
+                mime = { mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", m4a: "audio/mp4", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", txt: "text/plain", json: "application/json" }[ext.toLowerCase()] || "";
+              await flAdd(nm, new Blob([await x.bytes()], { type: mime }));
+              n++;
+            }
+            said.push(n + " file" + (n === 1 ? "" : "s"));
+          } else said.push("(add the 📁 Files extension to get its files back)");
+        }
+        const bj = get("blocks/blocks.json");
+        if (bj) {
+          if (EXI.includes("blocks")) {
+            const o = JSON.parse(await txt(bj));
+            BKS = (o.scripts || []).filter((s) => s && Array.isArray(s.b)).map((s) => ({ x: +s.x || 0, y: +s.y || 0, b: s.b.flatMap(bkFix) })).filter((s) => s.b.length);
+            if (o.variables && typeof o.variables === "object") {
+              BKVAR = o.variables;
+              bkVarSave();
+            }
+            bkSave();
+            if (document.querySelector(".bkpanel")) bkRender();
+            said.push(BKS.length + " script" + (BKS.length === 1 ? "" : "s"));
+          } else said.push("(add the 🧱 Blocks extension to get its scripts back)");
+        }
+        const pt = get("blocks/particles.json");
+        if (pt && typeof ptOn === "function") {
+          PT = JSON.parse(await txt(pt)) || [];
+          ptSave();
+          said.push(PT.length + " particle" + (PT.length === 1 ? "" : "s"));
+        }
+        const hb = get("blocks/hitboxes.json");
+        if (hb && typeof hbOn === "function") {
+          HB = JSON.parse(await txt(hb)) || {};
+          hbSave();
+          said.push(Object.keys(HB).length + " hitbox" + (Object.keys(HB).length === 1 ? "" : "es"));
+        }
+        if (typeof ptMenus === "function") ptMenus();
+        return "Opened: " + said.join(", ") + ".";
+      }
       $("zopen").onchange = async (e) => {
         const f = e.target.files[0];
         e.target.value = "";
@@ -13768,6 +13861,25 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         try {
           const list = readZip(await f.arrayBuffer()).filter((x) => !x.dir);
           $("zmsg2").textContent = f.name + " · " + list.length + " file" + (list.length === 1 ? "" : "s");
+          /* a zip the Zipper made: open all of it at once (project, Files, blocks, particles, hitboxes) */
+          const pj = list.find((x) => x.name === "project.json");
+          if (pj) {
+            const all = document.createElement("button");
+            all.className = "g";
+            all.textContent = "📂 Open everything from this zip";
+            all.onclick = async () => {
+              try {
+                $("zmsg2").textContent = "Opening…";
+                $("zmsg2").textContent = await zipOpenAll(list);
+              } catch (er) {
+                $("zmsg2").textContent = "Couldn’t open it (" + ((er && er.message) || er) + ").";
+              }
+            };
+            const r0 = document.createElement("div");
+            r0.className = "row";
+            r0.append(all);
+            L.appendChild(r0);
+          }
           list.forEach((x) => {
             const row = document.createElement("div"),
               nm = document.createElement("span"),
