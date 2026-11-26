@@ -1112,7 +1112,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 6.90</div>
+      <div id="studiover">Version 6.91</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -13599,19 +13599,22 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           if (!d) return;
           const pad = "  ".repeat(ind),
             kind = d.shape === "hat" ? " hat" : d.shape === "cap" ? " cap" : d.shape === "rep" || d.shape === "list" ? " reporter" : d.shape === "bool" ? " boolean" : "";
-          out.push(pad + words(b) + " ::" + kind + " " + col(d));
           if (["c", "c2", "c3"].includes(d.shape)) {
+            /* scratchblocks draws a block's mouth from { … } on their own lines; the colour goes after the last } */
+            out.push(pad + words(b) + " {");
             (b.s || []).forEach((q) => line(q, ind + 1));
             if (d.shape !== "c") {
-              out.push(pad + ((d.mids && d.mids[0]) || "else"));
+              out.push(pad + "} " + ((d.mids && d.mids[0]) || "else") + " {");
               (b.s2 || []).forEach((q) => line(q, ind + 1));
             }
             if (d.shape === "c3") {
-              out.push(pad + ((d.mids && d.mids[1]) || "else"));
+              out.push(pad + "} " + ((d.mids && d.mids[1]) || "else") + " {");
               (b.s3 || []).forEach((q) => line(q, ind + 1));
             }
-            out.push(pad + (d.bot || "end"));
+            out.push(pad + "}" + (d.bot ? " " + d.bot : "") + " :: " + col(d));
+            return;
           }
+          out.push(pad + words(b) + " ::" + kind + " " + col(d));
         };
         BKS.forEach((S, i) => {
           if (i) out.push("");
