@@ -383,6 +383,8 @@
       #cells { display: block; } /* only the Edit video timeline has rows (layers and sounds) */
       #cells .cell { flex: 0 0 var(--tlw, 26px); min-width: 0; } /* timeline zoom: a cell is never wider than one frame */
       #cells .trow.tnum .cell { position: relative; overflow: visible; }
+      #cells .cell.rsel { background: rgba(76, 151, 255, 0.28); }
+      #cells .cell.rsel.cur { background: rgba(255, 102, 128, 0.45); }
       .trow.tmark .tlab { cursor: default; color: #ffbf00; }
       .tmk { position: absolute; top: 3px; height: 18px; padding: 0 6px 0 5px; border-left: 2px solid #ffbf00; background: rgba(255, 191, 0, 0.18); color: #ffd666; font: 600 11px/18px system-ui, sans-serif; white-space: nowrap; border-radius: 0 6px 6px 0; cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
       .tmk.on { background: #ffbf00; color: #222; }
@@ -1121,7 +1123,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.52</div>
+      <div id="studiover">Version 7.62</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1257,7 +1259,7 @@
           <div class="ph">Layers · top of the list is in front</div>
           <div id="lays"></div>
           <div class="row">
-            <button id="ladd">+ Layer</button><button id="ldel">Delete layer</button><button id="lup">▲</button
+            <button id="ladd">+ Layer</button><button id="ldup" title="A copy of this layer (every frame), put just above it">⧉ Duplicate layer</button><button id="ldel">Delete layer</button><button id="lup">▲</button
             ><button id="ldn">▼</button><input id="lname" placeholder="Layer name" />
           </div>
           <div class="row"><button id="lfwd">Copy this frame to all following frames</button></div>
@@ -3137,7 +3139,61 @@
       }
       /* the Edit video timeline. Only the frames that can be seen (and some on each side) are drawn, with empty space for the
          rest, so even tens of thousands of frames stay fast; scrolling draws the new ones. */
-      let tlWin = [0, 0];
+      let tlWin = [0, 0],
+        TLSEL = null; /* frames picked by dragging across the timeline: [first, last] */
+      /* drag across the timeline to pick frames: they fill Copy frames' from / to boxes. A plain tap still goes to that frame. */
+      {
+        let st = null,
+          moved = false;
+        const idxAt = (x, y) => {
+          const c = document.elementsFromPoint(x, y).find((n) => n.classList && n.classList.contains("cell") && n.dataset.i != null);
+          return c ? +c.dataset.i : null;
+        };
+        $("cells").addEventListener("pointerdown", (e) => {
+          if (e.button > 0) return;
+          const i = idxAt(e.clientX, e.clientY);
+          if (i == null) return;
+          st = i;
+          moved = false;
+        });
+        window.addEventListener("pointermove", (e) => {
+          if (st == null || !(e.buttons & 1)) return;
+          const i = idxAt(e.clientX, Math.max(e.clientY, 0));
+          if (i == null || (!moved && i === st)) return;
+          moved = true;
+          const a = Math.min(st, i),
+            b = Math.max(st, i);
+          if (!TLSEL || TLSEL[0] !== a || TLSEL[1] !== b) {
+            TLSEL = [a, b];
+            $("fcpa").value = a + 1;
+            $("fcpb").value = b + 1;
+            $("fcpmsg").textContent = "Picked frames " + (a + 1) + " to " + (b + 1) + " (" + (b - a + 1) + "). Copy them, or Delete frames.";
+            markUi();
+            cells(true);
+          }
+        });
+        window.addEventListener(
+          "pointerup",
+          (e) => {
+            if (st == null) return;
+            if (moved) {
+              /* a drag is not a tap: don't jump to the frame under the finger */
+              const stop = (ev) => {
+                ev.stopPropagation();
+                ev.preventDefault();
+              };
+              window.addEventListener("click", stop, { capture: true, once: true });
+              setTimeout(() => window.removeEventListener("click", stop, true), 0);
+            } else if (TLSEL) {
+              TLSEL = null; /* a plain tap clears the picked frames */
+              $("fcpa").value = $("fcpb").value = "";
+              markUi();
+            }
+            st = null;
+          },
+          true,
+        );
+      }
       function cells(fromScroll) {
         const el = $("cells"),
           keep = el.scrollLeft,
@@ -3201,7 +3257,8 @@
         for (let i = a; i < b; i++) {
           const f = frames[i],
             d = document.createElement("div");
-          d.className = "cell" + (i === cur ? " cur" : "") + (f.tw ? " tw" : "");
+          d.className = "cell" + (i === cur ? " cur" : "") + (f.tw ? " tw" : "") + (TLSEL && i >= TLSEL[0] && i <= TLSEL[1] ? " rsel" : "");
+          d.dataset.i = i;
           d.innerHTML = "<span>" + ((i + 1) % every === 0 || i === 0 ? i + 1 : "") + "</span>";
           d.onclick = () => nav(i);
           nr.appendChild(d);
@@ -3223,7 +3280,8 @@
           for (let i = a; i < Math.min(b, K.length); i++) {
             const f = K[i],
               d = document.createElement("div");
-            d.className = "cell" + (i === cur ? " cur" : "") + (f.items.length || f.texts.length || f.layer ? " has" : "");
+            d.className = "cell" + (i === cur ? " cur" : "") + (f.items.length || f.texts.length || f.layer ? " has" : "") + (TLSEL && i >= TLSEL[0] && i <= TLSEL[1] ? " rsel" : "");
+            d.dataset.i = i;
             d.innerHTML = "<i></i>";
             d.onclick = () => {
               if (playing) setPlay(false);
@@ -3275,6 +3333,8 @@
         });
       }
       function markUi() {
+        const pk = TLSEL && TLSEL[1] > TLSEL[0] ? TLSEL[1] - TLSEL[0] + 1 : 0;
+        $("fdel").textContent = pk ? "Delete " + pk + " frames" : "Delete frame";
         const has = MARK.some((m) => m.f === cur);
         $("mkbtn").textContent = has ? "✕ Remove marker" : "📍 Marker";
       }
@@ -3433,6 +3493,22 @@
       $("fcp").onclick = frCopy;
       $("fpst").onclick = frPaste;
       $("fdel").onclick = () => {
+        if (TLSEL && TLSEL[1] > TLSEL[0]) {
+          /* picked frames: delete them all (always leave at least one frame) */
+          const [a, b] = TLSEL,
+            n = Math.min(b - a + 1, frames.length - 1);
+          if (n < 1) return;
+          for (let k = 0; k < n; k++) {
+            LAY.forEach((L) => L.k.splice(a, 1));
+            camRemove(a, frames.length);
+          }
+          TLSEL = null;
+          $("fcpa").value = $("fcpb").value = "";
+          $("fcpmsg").textContent = "Deleted " + n + " frame" + (n === 1 ? "" : "s") + ".";
+          dirty = true;
+          nav(Math.min(a, frames.length - 1));
+          return;
+        }
         if (frames.length < 2) return;
         LAY.forEach((L) => L.k.splice(cur, 1));
         camRemove(cur, frames.length);
@@ -9510,6 +9586,21 @@
         ac++;
         frames = LAY[ac].k;
         sel = -1;
+        layUi();
+        ui();
+      };
+      $("ldup").onclick = () => {
+        const L = LAY[ac];
+        LAY.splice(ac + 1, 0, {
+          id: Math.max(0, ...LAY.map((q) => q.id || 0)) + 1,
+          n: (L.n || "Layer") + " copy",
+          vis: L.vis !== false,
+          k: L.k.map(clone),
+        });
+        ac++;
+        frames = LAY[ac].k;
+        sel = -1;
+        dirty = true;
         layUi();
         ui();
       };
