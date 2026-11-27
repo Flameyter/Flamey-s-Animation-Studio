@@ -1137,7 +1137,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 8.27</div>
+      <div id="studiover">Version 8.37</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2026,6 +2026,7 @@
             ><button id="exmp4" class="g">Export video (.mp4)</button
             ><button id="exp" class="on">Export project (.json)</button>
           </div>
+          <div class="row"><label class="sl" style="flex: 0 1 340px">Video quality<select id="xq"><option value="small">Small file (good for the Video sharer's 10 MB)</option><option value="yt" selected>YouTube (sharp, YouTube's own advice)</option><option value="best">Best (sharpest, biggest file)</option></select></label></div>
           <div class="lbl vlen"></div>
           <div class="row">
             <label class="up">Open project<input type="file" id="imp" accept=".json,application/json" hidden /></label
@@ -2460,6 +2461,29 @@
          on this screen (z is the extra zoom of the costume editor) */
       /* Sharp pictures on retina screens (iPad): the canvas keeps more pixels than the picture has, and everything is
          still drawn in picture units (w x h) through a scale. Returns nothing; call before drawing each frame. */
+      /* Watch video draws at exactly the screen's pixels (also in fullscreen), so a big video like 1920 x 1080 shown
+         smaller is drawn crisp at that size instead of being shrunk by the browser (which makes jaggy edges), and a
+         small one shown big is drawn sharp instead of stretched. At most 4K worth of pixels. */
+      function wRes() {
+        const c = $("wc"),
+          r = c.getBoundingClientRect();
+        if (!r.width) return;
+        let w = Math.round(r.width * (window.devicePixelRatio || 1)),
+          h = Math.round((w * CH) / CW);
+        const big = Math.sqrt((w * h) / (3840 * 2160));
+        if (big > 1) {
+          w = Math.round(w / big);
+          h = Math.round(h / big);
+        }
+        if (c.width !== w || c.height !== h) {
+          c.width = w;
+          c.height = h;
+        }
+        wg.setTransform(w / CW, 0, 0, h / CH, 0, 0);
+        wg.imageSmoothingEnabled = true;
+        wg.imageSmoothingQuality = "high";
+        c._sw = CW;
+      }
       function hiRes(c, x, w, h) {
         const r = c.getBoundingClientRect();
         if (r.width) {
@@ -3213,7 +3237,7 @@
             g.restore();
           }
         } else if (view === "watch") {
-          hiRes($("wc"), wg, CW, CH);
+          wRes();
           render(wg, cur, false, false, false, subT());
         }
         else if (view === "assets") erender();
@@ -4305,7 +4329,7 @@
           rc = mk(),
           rg = rc.getContext("2d"),
           ch = [];
-        const r = new MediaRecorder(rc.captureStream(fps), { mimeType: mt, videoBitsPerSecond: 5e6 });
+        const r = new MediaRecorder(rc.captureStream(fps), { mimeType: mt, videoBitsPerSecond: xRate(CW, CH, 30) });
         r.ondataavailable = (e) => e.data.size && ch.push(e.data);
         const done = new Promise((res) => (r.onstop = res)),
           wait = () => new Promise((s) => setTimeout(s, 1000 / fps));
@@ -10259,7 +10283,7 @@
             c = mk2(w, h),
             x = c.getContext("2d"),
             ch = [];
-          const r = new MediaRecorder(c.captureStream(30), { mimeType: mt, videoBitsPerSecond: 6e6 });
+          const r = new MediaRecorder(c.captureStream(30), { mimeType: mt, videoBitsPerSecond: xRate(CW, CH, 30) });
           r.ondataavailable = (e) => e.data.size && ch.push(e.data);
           const done = new Promise((res) => (r.onstop = res)),
             draw = () => x.drawImage(v, 0, 0, w, h);
@@ -10323,10 +10347,10 @@
           },
         });
         const cfg = {
-            codec: w * h > 921600 ? "avc1.640028" : "avc1.42001f",
+            codec: xCodec(w, h),
             width: w,
             height: h,
-            bitrate: 5e6,
+            bitrate: xRate(w, h, fps),
             framerate: fps,
           },
           sup = await VideoEncoder.isConfigSupported(cfg);
@@ -10377,6 +10401,25 @@
           await idbSet(XP_KEY, null);
         } catch (e) {}
       }
+      /* Video quality (Export › Video quality, localStorage oss_xq). Bits per second for a W x H video at fr frames a second:
+         Small = the old ≤ 5 Mbps; YouTube = YouTube's advice (about 8 Mbps for 1080p, 16 for 1440p, 35 for 4K, ×1.5 above 30 fps);
+         Best = twice that. xCodec picks an H.264 level big enough for the size. */
+      try {
+        const q = localStorage.getItem("oss_xq");
+        if (q && $("xq").querySelector('option[value="' + q + '"]')) $("xq").value = q;
+      } catch (e) {}
+      $("xq").onchange = () => {
+        try {
+          localStorage.setItem("oss_xq", $("xq").value);
+        } catch (e) {}
+      };
+      function xRate(W, H, fr) {
+        const q = $("xq").value;
+        if (q === "small") return Math.round(Math.max(1e6, Math.min(5e6, W * H * fr * 0.25)));
+        const yt = Math.max(2.5e6, W * H * 4) * (fr > 30 ? 1.5 : 1);
+        return Math.round(Math.min(q === "best" ? 2 * yt : yt, 120e6));
+      }
+      const xCodec = (W, H) => (W * H <= 921600 ? "avc1.42001f" : W * H <= 2228224 ? "avc1.64002a" : W * H <= 9437184 ? "avc1.640033" : "avc1.640034");
       const xpSig = () => ptHash(JSON.stringify([CW, CH, +$("fps").value || 8, frames.length, proj(), EXI.includes("blocks") ? BKS : null, FX])).toString(36);
       async function exportLong() {
         await loadMux();
@@ -10389,7 +10432,7 @@
           parts = Math.ceil(N / PART),
           sig = xpSig(),
           say = (t) => ($("emsg").textContent = t);
-        const cfg = { codec: W * H > 921600 ? "avc1.640028" : "avc1.42001f", width: W, height: H, bitrate: Math.round(Math.max(1e6, Math.min(5e6, W * H * fps * SUB * 0.25))), framerate: fps * SUB };
+        const cfg = { codec: xCodec(W, H), width: W, height: H, bitrate: xRate(W, H, fps * SUB), framerate: fps * SUB };
         if (!(await VideoEncoder.isConfigSupported(cfg)).supported) throw new Error("H.264 isn’t supported here");
         let job = null;
         try {
@@ -11606,7 +11649,7 @@
         const SUB = LAY.some((L) => L.k.some((f) => f.tw)) ? Math.max(1, Math.ceil(30 / fps)) : 1,
           dest = A.createMediaStreamDestination(),
           stream = new MediaStream([...rc.captureStream(fps * SUB).getVideoTracks(), ...dest.stream.getAudioTracks()]);
-        const r = new MediaRecorder(stream, { mimeType: mt, videoBitsPerSecond: 5e6 }),
+        const r = new MediaRecorder(stream, { mimeType: mt, videoBitsPerSecond: xRate(CW, CH, 30) }),
           ch = [];
         r.ondataavailable = (e) => e.data.size && ch.push(e.data);
         const done = new Promise((res) => (r.onstop = res));
