@@ -120,12 +120,13 @@
       #welcome small { display: block; margin-top: 10px; opacity: 0.85; }
       #welcome kbd { padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.2); font: 700 12px system-ui, sans-serif; }
       /* Watch video fullscreen: the video fills the screen on black, the buttons float at the bottom and hide when the mouse rests */
-      .v-watch:fullscreen { background: #000; display: flex; align-items: center; justify-content: center; padding: 0; margin: 0; }
-      .v-watch:fullscreen #wc { width: min(100vw, calc(100vh * 16 / 9)); max-width: none; border: 0; border-radius: 0; }
-      .v-watch:fullscreen > .row { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); margin: 0; padding: 8px 12px; border-radius: 14px; background: rgba(20, 20, 24, 0.72); color: #fff; flex-wrap: nowrap; transition: opacity 0.35s; }
-      .v-watch:fullscreen > .vlen { position: fixed; top: 12px; left: 16px; width: max-content; margin: 0; color: #fff; background: rgba(20, 20, 24, 0.6); padding: 4px 10px; border-radius: 10px; transition: opacity 0.35s; }
-      .v-watch.wfidle:fullscreen { cursor: none; }
-      .v-watch.wfidle:fullscreen > .row, .v-watch.wfidle:fullscreen > .vlen { opacity: 0; pointer-events: none; }
+      .v-watch:fullscreen, .v-watch.wfake { background: #000; display: flex; align-items: center; justify-content: center; padding: 0; margin: 0; }
+      .v-watch.wfake { position: fixed; inset: 0; z-index: 2147483000; }
+      .v-watch:fullscreen #wc, .v-watch.wfake #wc { width: min(100vw, calc(100vh * 16 / 9)); max-width: none; border: 0; border-radius: 0; }
+      .v-watch:fullscreen > .row, .v-watch.wfake > .row { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); margin: 0; padding: 8px 12px; border-radius: 14px; background: rgba(20, 20, 24, 0.72); color: #fff; flex-wrap: nowrap; white-space: nowrap; transition: opacity 0.35s; }
+      .v-watch:fullscreen > .vlen, .v-watch.wfake > .vlen { position: fixed; top: 12px; left: 16px; width: max-content; margin: 0; color: #fff; background: rgba(20, 20, 24, 0.6); padding: 4px 10px; border-radius: 10px; transition: opacity 0.35s; }
+      .v-watch.wfidle:fullscreen, .v-watch.wfidle.wfake { cursor: none; }
+      .v-watch.wfidle:fullscreen > .row, .v-watch.wfidle:fullscreen > .vlen, .v-watch.wfidle.wfake > .row, .v-watch.wfidle.wfake > .vlen { opacity: 0; pointer-events: none; }
       #wclose { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 14px; cursor: pointer; }
       @media (hover: none) { #welcome .wkeys { display: none; } }
       .blk {
@@ -1136,7 +1137,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 8.26</div>
+      <div id="studiover">Version 8.27</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -10615,28 +10616,37 @@
          without the mouse moving while it plays. ===== */
       const WV = document.querySelector(".v-watch");
       let wfT = 0;
+      /* inside a frame that doesn't allow fullscreen (like PenguinMod's Iframe), the page fills the whole frame instead (class wfake) */
+      const wfOn = () => document.fullscreenElement === WV || WV.classList.contains("wfake");
       function wfPoke() {
         WV.classList.remove("wfidle");
         clearTimeout(wfT);
-        if (document.fullscreenElement === WV) wfT = setTimeout(() => playing && WV.classList.add("wfidle"), 2500);
+        if (wfOn()) wfT = setTimeout(() => playing && wfOn() && WV.classList.add("wfidle"), 2500);
+      }
+      function wfShow() {
+        $("wfull").textContent = wfOn() ? "✕ Leave fullscreen" : "⛶ Fullscreen";
+        wfPoke();
+      }
+      function wfFake(on) {
+        WV.classList.toggle("wfake", on);
+        wfShow();
       }
       function wfToggle() {
+        if (WV.classList.contains("wfake")) return wfFake(false);
         if (document.fullscreenElement === WV) return document.exitFullscreen().catch(() => {});
-        if (!WV.requestFullscreen) return;
-        WV.requestFullscreen().catch(() => {
-          $("wfl").title = "This browser or page doesn't allow fullscreen here.";
-        });
+        if (!WV.requestFullscreen || !document.fullscreenEnabled) return wfFake(true);
+        WV.requestFullscreen().catch(() => wfFake(true));
       }
       $("wfull").onclick = wfToggle;
       $("wc").addEventListener("dblclick", wfToggle);
       ["pointermove", "pointerdown", "keydown"].forEach((t) => WV.addEventListener(t, wfPoke));
-      document.addEventListener("fullscreenchange", () => {
-        const on = document.fullscreenElement === WV;
-        $("wfull").textContent = on ? "✕ Leave fullscreen" : "⛶ Fullscreen";
-        wfPoke();
+      document.addEventListener("fullscreenchange", wfShow);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && WV.classList.contains("wfake")) wfFake(false);
       });
       setInterval(() => {
-        if (document.fullscreenElement === WV && !playing) WV.classList.remove("wfidle");
+        if (WV.classList.contains("wfake") && view !== "watch") wfFake(false);
+        if (wfOn() && !playing) WV.classList.remove("wfidle");
       }, 500);
       const VLEN_VIEWS = ["zipper", "etext", "watch", "camera", "edit", "naming", "audio", "scenery", "effects", "menucust", "export"];
       VLEN_VIEWS.forEach((v) => {
