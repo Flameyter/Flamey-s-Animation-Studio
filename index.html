@@ -387,6 +387,8 @@
       #cells .cell.rsel.cur { background: rgba(255, 102, 128, 0.45); }
       #cells .cell.rdst { box-shadow: inset 0 2px 0 #ffbf00, inset 0 -2px 0 #ffbf00; } /* where dragged frames will land */
       #cells .cell.rsel { cursor: grab; }
+      #excreate textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit; font-size: 14px; color: inherit; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--ln); border-radius: 8px; padding: 8px 10px; resize: vertical; }
+      #excreate > label.sl { display: block; margin-top: 8px; }
       .trow.tmark .tlab { cursor: default; color: #ffbf00; }
       .tmk { position: absolute; top: 3px; height: 18px; padding: 0 6px 0 5px; border-left: 2px solid #ffbf00; background: rgba(255, 191, 0, 0.18); color: #ffd666; font: 600 11px/18px system-ui, sans-serif; white-space: nowrap; border-radius: 0 6px 6px 0; cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
       .tmk.on { background: #ffbf00; color: #222; }
@@ -1125,7 +1127,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.93</div>
+      <div id="studiover">Version 8.03</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1987,6 +1989,20 @@
         <div class="pn" id="exhome">
           <div class="ph">Extensions</div>
           <div id="exlist" class="exgrid"></div>
+        </div>
+        <div class="pn" id="excreate">
+          <div class="ph">💡 Extension creator</div>
+          <div class="lbl">Have an idea for an extension? Write it here and send it to Flamey. It opens GitHub with your idea filled in (you need a GitHub account); Flamey gets it by email. No account? Copy it instead.</div>
+          <div class="row"><label class="sl" style="flex: 2">Name<input type="text" id="xcn" maxlength="40" placeholder="e.g. Fire effects" /></label><label class="sl" style="flex: 0 0 90px">Icon<input type="text" id="xci" maxlength="4" placeholder="🔥" /></label></div>
+          <div class="row">
+            <label class="sl" style="flex: 1">Kind<select id="xck"><option value="add-on">Add-on (works inside a slot)</option><option value="slot">New slot (its own page)</option></select></label
+            ><label class="sl" style="flex: 1">Belongs to<select id="xcs"></select></label>
+          </div>
+          <label class="sl">What should it do?<textarea id="xcw" rows="4" maxlength="3000" placeholder="Describe what it adds, what the buttons or blocks do, and why it would help."></textarea></label>
+          <label class="sl">Blocks it needs (if any)<textarea id="xcb" rows="2" maxlength="1500" placeholder="e.g. a command block: make fire at x: () y: ()"></textarea></label>
+          <label class="sl">Your name (optional)<input type="text" id="xcby" maxlength="40" placeholder="So Flamey knows who it's from" /></label>
+          <div class="row"><button id="xcsend" class="g">📨 Send to Flamey (GitHub)</button><button id="xccopy">📋 Copy the request</button></div>
+          <div id="xcmsg" class="lbl"></div>
         </div>
         <div id="expanel" hidden>
           <div class="pn"><button id="exback">← All extensions</button><div id="exbanner" class="exbanner" style="margin-top: 10px"></div><div id="exinfo" class="exinfo"></div></div>
@@ -4738,6 +4754,7 @@
           if (open.instr) inf.appendChild(exMk("Instructions", open.instr));
         }
         $("exhome").hidden = !!open;
+        $("excreate").hidden = !!open;
         EXT.filter((x) => x.panel).forEach((x) => ($(x.panel).hidden = !(open && open.id === x.id)));
       }
       /* ===== Upgrades: every slot and extension is locked until you pay for it with energy.
@@ -7995,6 +8012,57 @@
         ws.__ready = true;
       }
       $("exback").onclick = () => exUi();
+      /* 💡 Extension creator: an idea becomes a GitHub issue on the studio's repo (Joel gets it by email from GitHub).
+         Joel's own email is never put in the page. */
+      const XC_REPO = "https://github.com/Flameyter/Flamey-s-Animation-Studio/issues/new";
+      function xcFill() {
+        const s = $("xcs");
+        if (s.options.length) return;
+        [["any", "Anything / not sure"]].concat(Object.keys(SLOTS).map((k) => [k, SLOTS[k][0]])).forEach(([v, t]) => {
+          const o = document.createElement("option");
+          o.value = v;
+          o.textContent = t;
+          s.appendChild(o);
+        });
+      }
+      function xcText() {
+        const n = $("xcn").value.trim(),
+          ic = $("xci").value.trim(),
+          w = $("xcw").value.trim();
+        if (!n || !w) return null;
+        const s = $("xcs"),
+          slot = s.options[s.selectedIndex] ? s.options[s.selectedIndex].textContent : "";
+        const body = [
+          "**Extension idea:** " + (ic ? ic + " " : "") + n,
+          "**Kind:** " + $("xck").value + ($("xck").value === "add-on" ? " · belongs to: " + slot : ""),
+          "",
+          "**What it should do**",
+          w,
+        ];
+        if ($("xcb").value.trim()) body.push("", "**Blocks it needs**", $("xcb").value.trim());
+        if ($("xcby").value.trim()) body.push("", "**From:** " + $("xcby").value.trim());
+        body.push("", "_Sent with the Extension creator in Flamey's Animation Studio (" + $("studiover").textContent + ")._");
+        return { title: "Extension idea: " + (ic ? ic + " " : "") + n, body: body.join("\n") };
+      }
+      $("xcsend").onclick = () => {
+        const t = xcText();
+        if (!t) return ($("xcmsg").textContent = "Give it a name and say what it should do first.");
+        const u = XC_REPO + "?title=" + encodeURIComponent(t.title) + "&body=" + encodeURIComponent(t.body.slice(0, 5000));
+        window.open(u, "_blank", "noopener,noreferrer");
+        $("xcmsg").textContent = "GitHub opened in a new tab. Check it and press “Submit new issue” there to send it.";
+      };
+      $("xccopy").onclick = async () => {
+        const t = xcText();
+        if (!t) return ($("xcmsg").textContent = "Give it a name and say what it should do first.");
+        const all = t.title + "\n\n" + t.body;
+        try {
+          await navigator.clipboard.writeText(all);
+          $("xcmsg").textContent = "Copied. Paste it wherever you talk to Flamey.";
+        } catch (e) {
+          showText(new Blob([all], { type: "text/plain" }));
+        }
+      };
+      $("xck").onchange = () => ($("xcs").disabled = $("xck").value !== "add-on");
       function go(v) {
         if (v && upgLocked(v)) {
           upgNeed = v;
@@ -8020,7 +8088,10 @@
           cur = 0;
           setPlay(true);
         }
-        if (v === "extensions") exUi();
+        if (v === "extensions") {
+          exUi();
+          xcFill();
+        }
         if (v === "upgrades") upgUi();
         if (v === "blocks") blkUi();
         if (v === "camera") camUi();

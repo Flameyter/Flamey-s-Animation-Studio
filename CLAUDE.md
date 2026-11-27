@@ -8,7 +8,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - Joel's YouTube channel: **Flamey :)**, https://www.youtube.com/@CrazyPWAF (about 2.65K subscribers). Videos made in the studio go here.
 
 ## Version
-- The version is shown at the bottom of the main menu (`#studiover`, "Version 7.93"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
+- The version is shown at the bottom of the main menu (`#studiover`, "Version 8.03"). It started at 5.7. Add 0.1 for a big round of new things and 0.01 for a round of fixes, and update it when pushing a round.
 
 ## Checking your work
 - Syntax: pull the inline scripts out into one file and run `node --check` on it.
@@ -54,6 +54,7 @@ One big HTML file (`Flamey_s_Official_Animation_Studio_extensions.html`, ~1.6 MB
 - Edit video timeline zoom: 🔍− / 🔍+ next to Undo tween (`TLZ` widths 3, 6, 13, 26, 40 px per frame, `TLW`, kept in localStorage `oss_tlw`); frame numbers every 5/10/25/100 frames as it shrinks. The timeline only draws the frames in view plus 60 to 120 around them (`tlWin`, spacers for the rest; scrolling redraws with `cells(true)`), so 10,000 frames stay fast. Frame numbers are absolutely placed so a number wider than a cell can't push the number row out of line with the dots (`min-width: 0`).
 - FPS can be a decimal from 0.1 to 30 (0.5 = a frame every 2 seconds); Settings rounds to one decimal.
 - Extension pictures: Joel drew icons and banners for Weather, Particles, Hitbox, Camera shake, Sound effects and Files (in `EXT[].art`: icon 256 px JPEG, banner 800×450 JPEG, ratio 1920 / 1080). The Files icon is cut from its banner around the folder, the Weather icon from the middle of his cloud picture.
+- 💡 Extension creator (bottom of the Extensions page, `#excreate`): name, icon, kind, belongs to, what it should do, blocks, from; 📨 Send opens a prefilled GitHub issue on Flameyter/Flamey-s-Animation-Studio (`XC_REPO`; GitHub emails Joel), 📋 Copy copies the request. Joel's email is never put in the page (public site: spam); he agreed to the GitHub issue way.
 - If saving the project to the browser fails, the corner sign turns red: "Not saved ✗ · use Export project or Zipper" (`doSave`).
 - Speed check (v6.68): one frame with all 22 effects ≈ 28 ms, Edit video 60 fps, 1000 frames: changing frame ≈ 30 ms, saving ≈ 5 ms. Projects save to IndexedDB, not localStorage.
 - No physics or ragdoll blocks (Joel does that himself): the old `make () able to handle physics` block and the planned `if bounce, play sound` were dropped.
