@@ -1127,7 +1127,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 8.03</div>
+      <div id="studiover">Version 8.04</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1993,7 +1993,8 @@
         <div class="pn" id="excreate">
           <div class="ph">💡 Extension creator</div>
           <div class="lbl">Have an idea for an extension? Write it here and send it to Flamey. It opens GitHub with your idea filled in (you need a GitHub account); Flamey gets it by email. No account? Copy it instead.</div>
-          <div class="row"><label class="sl" style="flex: 2">Name<input type="text" id="xcn" maxlength="40" placeholder="e.g. Fire effects" /></label><label class="sl" style="flex: 0 0 90px">Icon<input type="text" id="xci" maxlength="4" placeholder="🔥" /></label></div>
+          <div class="row"><label class="sl" style="flex: 2">Name<input type="text" id="xcn" maxlength="40" placeholder="e.g. Fire effects" /></label><label class="sl" style="flex: 0 0 160px">Icon (emoji, or a code like :sob:)<input type="text" id="xci" maxlength="32" /></label></div>
+          <div class="row" id="xcpick" style="gap: 4px"></div>
           <div class="row">
             <label class="sl" style="flex: 1">Kind<select id="xck"><option value="add-on">Add-on (works inside a slot)</option><option value="slot">New slot (its own page)</option></select></label
             ><label class="sl" style="flex: 1">Belongs to<select id="xcs"></select></label>
@@ -8015,6 +8016,16 @@
       /* 💡 Extension creator: an idea becomes a GitHub issue on the studio's repo (Joel gets it by email from GitHub).
          Joel's own email is never put in the page. */
       const XC_REPO = "https://github.com/Flameyter/Flamey-s-Animation-Studio/issues/new";
+      /* tap an emoji to use it as the icon (typing emojis is hard on some computers); codes like :sob: work too,
+         GitHub shows them as emojis */
+      "🔥 ⚡ 💥 🌀 ✨ 🎨 🎵 🎬 🧩 ⭐ 🌈 💧 🍂 👻 🤖 🐱 😭 😂 😎 🎮".split(" ").forEach((em) => {
+        const b = document.createElement("button");
+        b.textContent = em;
+        b.style.cssText = "padding:4px 8px;font-size:18px";
+        b.title = "Use " + em;
+        b.onclick = () => ($("xci").value = em);
+        $("xcpick").appendChild(b);
+      });
       function xcFill() {
         const s = $("xcs");
         if (s.options.length) return;
