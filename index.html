@@ -1121,7 +1121,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.42</div>
+      <div id="studiover">Version 7.52</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1244,6 +1244,13 @@
           <div class="row">
             <button id="fcopy">+ Keyframe (copy)</button><button id="fblank">+ Blank</button
             ><button id="fdel">Delete frame</button>
+          </div>
+          <div class="row" style="align-items: center">
+            <button id="fcp" title="Copy these frames, on every layer (Ctrl + C)">📋 Copy frames</button
+            ><label class="sl" style="flex: 0 0 auto">from<input type="number" id="fcpa" min="1" style="width: 72px" /></label
+            ><label class="sl" style="flex: 0 0 auto">to<input type="number" id="fcpb" min="1" style="width: 72px" /></label
+            ><button id="fpst" title="Paste the copied frames right after this frame (Ctrl + V)" disabled>📌 Paste after this frame</button>
+            <span id="fcpmsg" class="lbl"></span>
           </div>
         </div>
         <div class="pn">
@@ -3300,6 +3307,7 @@
         twUi();
         markUi();
         cells();
+        if (typeof vidLenUi === "function") vidLenUi(); /* the video length follows at once */
         camUi();
         if (view === "etext") etFill();
       }
@@ -3388,6 +3396,42 @@
         camInsert(cur + 1);
         nav(cur + 1);
       };
+      /* copy and paste frames: a range of frames (on every layer, with their cameras) is kept, and can be pasted after any
+         frame as many times as you like. Leave the boxes empty to copy just the frame you're on. */
+      let FCLIP = null;
+      function frCopy() {
+        const N = frames.length,
+          rd = (id) => ($(id).value === "" ? cur : Math.max(0, Math.min(N - 1, Math.round(+$(id).value) - 1))),
+          a0 = rd("fcpa"),
+          b0 = $("fcpb").value === "" ? a0 : rd("fcpb"),
+          a = Math.min(a0, b0),
+          b = Math.max(a0, b0);
+        FCLIP = { lay: {}, cam: CAM.slice(a, b + 1).map((c) => (c ? { ...c } : null)), n: b - a + 1 };
+        LAY.forEach((L) => (FCLIP.lay[L.id] = L.k.slice(a, b + 1).map(clone)));
+        $("fpst").disabled = false;
+        $("fpst").textContent = "📌 Paste " + FCLIP.n + " frame" + (FCLIP.n === 1 ? "" : "s") + " after this frame";
+        $("fcpmsg").textContent = "Copied frame" + (a === b ? " " + (a + 1) : "s " + (a + 1) + " to " + (b + 1)) + ".";
+      }
+      function frPaste() {
+        if (!FCLIP) return;
+        const at = cur + 1,
+          n = FCLIP.n;
+        LAY.forEach((L) => {
+          const src = FCLIP.lay[L.id];
+          const add = [];
+          for (let k = 0; k < n; k++) add.push(src && src[k] ? clone(src[k]) : { items: [], texts: [], layer: null });
+          L.k.splice(at, 0, ...add);
+        });
+        for (let k = 0; k < n; k++) {
+          camInsert(at + k);
+          if (FCLIP.cam[k]) CAM[at + k] = { ...FCLIP.cam[k] };
+        }
+        dirty = true;
+        $("fcpmsg").textContent = "Pasted " + n + " frame" + (n === 1 ? "" : "s") + " after frame " + at + ".";
+        nav(at);
+      }
+      $("fcp").onclick = frCopy;
+      $("fpst").onclick = frPaste;
       $("fdel").onclick = () => {
         if (frames.length < 2) return;
         LAY.forEach((L) => L.k.splice(cur, 1));
@@ -3409,7 +3453,7 @@
         d.id = "keyshelp";
         d.innerHTML =
           "<b>Keyboard shortcuts</b><table>" +
-          [["Space", "Play / stop"], ["← →", "Previous / next frame"], ["Shift + ← →", "Back / forward 10 frames"], ["Home / End", "First / last frame"], ["[ / ]", "Previous / next marker"], ["↑ ↓  or  + −", "Zoom the timeline in / out (Edit video)"], ["Ctrl + Z", "Undo"], ["Ctrl + Shift + Z", "Redo"], ["?", "Show or hide this list"]]
+          [["Space", "Play / stop"], ["← →", "Previous / next frame"], ["Shift + ← →", "Back / forward 10 frames"], ["Home / End", "First / last frame"], ["[ / ]", "Previous / next marker"], ["↑ ↓  or  + −", "Zoom the timeline in / out (Edit video)"], ["Ctrl + C / Ctrl + V", "Copy / paste frames (Edit video)"], ["Ctrl + Z", "Undo"], ["Ctrl + Shift + Z", "Redo"], ["?", "Show or hide this list"]]
             .map(([k, t]) => "<tr><td><kbd>" + k + "</kbd></td><td>" + t + "</td></tr>")
             .join("") +
           "</table><small>Tap anywhere to close</small>";
@@ -3427,6 +3471,12 @@
           if (!b) return;
           e.preventDefault();
           b.click();
+          return;
+        }
+        if (mod && !e.altKey && view === "edit" && (e.key === "c" || e.key === "C" || e.key === "v" || e.key === "V") && !(window.getSelection && String(window.getSelection()))) {
+          e.preventDefault();
+          if (e.key === "c" || e.key === "C") frCopy();
+          else frPaste();
           return;
         }
         if (mod || e.altKey) return;
