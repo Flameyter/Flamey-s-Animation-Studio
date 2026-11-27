@@ -388,7 +388,9 @@
       #cells .cell.rdst { box-shadow: inset 0 2px 0 #ffbf00, inset 0 -2px 0 #ffbf00; } /* where dragged frames will land */
       #cells .cell.rsel { cursor: grab; }
       #excreate textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit; font-size: 14px; color: inherit; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--ln); border-radius: 8px; padding: 8px 10px; resize: vertical; }
-      #excreate > label.sl { display: block; margin-top: 8px; }
+      #excreate > label.sl, #vshare > label.sl { display: block; margin-top: 8px; }
+      #vshare textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit; font-size: 14px; color: inherit; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--ln); border-radius: 8px; padding: 8px 10px; resize: vertical; }
+      #vsprev { display: block; }
       .trow.tmark .tlab { cursor: default; color: #ffbf00; }
       .tmk { position: absolute; top: 3px; height: 18px; padding: 0 6px 0 5px; border-left: 2px solid #ffbf00; background: rgba(255, 191, 0, 0.18); color: #ffd666; font: 600 11px/18px system-ui, sans-serif; white-space: nowrap; border-radius: 0 6px 6px 0; cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
       .tmk.on { background: #ffbf00; color: #222; }
@@ -1127,7 +1129,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 8.06</div>
+      <div id="studiover">Version 8.16</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -2050,6 +2052,21 @@
           <div class="row"><button id="lkgo" class="g">⬇ Load link</button><button id="lkpaste">📋 Paste from clipboard</button></div>
           <div class="lbl">Works with pictures (png, jpg, gif, webp, svg), sounds (mp3, wav, ogg, m4a, webm), project files (.json) and data: links. Heads up: browsers only let this page read links from sites that allow it, and this hosted page blocks most outside sites. If a link is refused, download the file and use an Upload button instead.</div>
           <div id="lkmsg"></div>
+        </div>
+        <div class="pn" id="vshare">
+          <div class="ph">🎬 Video sharer · share a video on GitHub</div>
+          <div class="lbl">Share a video you made so Flamey and everyone else can watch it. Make it in Export first, then pick it here. It opens GitHub with the details filled in: drag the video file into the box there and press “Submit new issue” (you need a free GitHub account). GitHub keeps videos up to 10 MB.</div>
+          <div class="row"><input type="file" id="vsfile" accept="video/*,.mp4,.webm,.mov" /></div>
+          <video id="vsprev" controls playsinline hidden style="max-width: 100%; max-height: 240px; margin-top: 6px; border-radius: 8px; background: #000"></video>
+          <label class="sl">Title<input type="text" id="vst" maxlength="80" placeholder="e.g. Stickman fight" /></label>
+          <label class="sl">About the video (optional)<textarea id="vsw" rows="2" maxlength="1500"></textarea></label>
+          <label class="sl">Your name (optional)<input type="text" id="vsby" maxlength="40" /></label>
+          <div class="row"><button id="vssend" class="g">📨 Share on GitHub</button><button id="vsdl" hidden>⬇ Download it again</button></div>
+          <div id="vsmsg" class="lbl"></div>
+          <div class="ph" style="margin-top: 12px">🎞 Shared videos</div>
+          <div class="lbl">Videos show here after Flamey checks them (he gives them the “video” label on GitHub). 📋 Copy link gives a link to the video, for What's New.</div>
+          <div class="row"><button id="vsload">🔄 Show shared videos</button></div>
+          <div id="vslist"></div>
         </div>
         <div class="pn">
           <div class="ph">Go to a website · opens in a new tab</div>
@@ -8089,6 +8106,111 @@
         }
       };
       $("xck").onchange = () => ($("xcs").disabled = $("xck").value !== "add-on");
+      /* ===== Video sharer (Upload by link): share a video as a GitHub issue. The page can't upload by itself
+         (that needs a GitHub login), so it opens a filled-in issue and the person drags the video in.
+         Shared videos lists issues Joel gave the "video" label (only he can label), so nothing shows unchecked. ===== */
+      const VS_API = "https://api.github.com/repos/Flameyter/Flamey-s-Animation-Studio/issues";
+      let vsBlob = null, vsUrl = "";
+      $("vsfile").onchange = () => {
+        const f = $("vsfile").files[0];
+        if (vsUrl) URL.revokeObjectURL(vsUrl);
+        vsBlob = f || null;
+        vsUrl = f ? URL.createObjectURL(f) : "";
+        $("vsprev").hidden = !f;
+        $("vsdl").hidden = !f;
+        if (!f) return;
+        $("vsprev").src = vsUrl;
+        if (!$("vst").value.trim()) $("vst").value = f.name.replace(/\.[^.]+$/, "").slice(0, 80);
+        const mb = f.size / 1048576;
+        $("vsmsg").textContent =
+          mb.toFixed(1) + " MB" + (mb > 10 ? " · too big for GitHub (10 MB). Make it shorter or smaller in Export, or put it on YouTube and share the link." : " · fits on GitHub.");
+      };
+      $("vsdl").onclick = () => {
+        if (!vsBlob) return;
+        const a = document.createElement("a");
+        a.href = vsUrl;
+        a.download = vsBlob.name || "video.mp4";
+        a.click();
+      };
+      ["vst", "vsw", "vsby"].forEach((id) => $(id).addEventListener("input", () => xcEmoji($(id))));
+      $("vssend").onclick = () => {
+        const t = $("vst").value.trim();
+        if (!t) return ($("vsmsg").textContent = "Give the video a title first.");
+        if (vsBlob && vsBlob.size > 10 * 1048576) return ($("vsmsg").textContent = "This video is over 10 MB, so GitHub won't take it. Make it shorter or smaller in Export first.");
+        const body = ["**Video:** " + t];
+        if ($("vsby").value.trim()) body.push("**By:** " + $("vsby").value.trim());
+        if ($("vsw").value.trim()) body.push("", $("vsw").value.trim());
+        body.push("", "⬇ Drag the video file into this box, just under this line ⬇", "", "", "_Shared with the Video sharer in Flamey's Animation Studio (" + $("studiover").textContent + ")._");
+        const u = XC_REPO + "?title=" + encodeURIComponent("🎬 Video: " + t) + "&body=" + encodeURIComponent(body.join("\n").slice(0, 5000));
+        window.open(u, "_blank", "noopener,noreferrer");
+        $("vsmsg").textContent = "GitHub opened in a new tab. Drag " + (vsBlob ? "“" + vsBlob.name + "”" : "your video") + " into the box there, wait for it to upload, then press “Submit new issue”.";
+      };
+      function vsLink(body) {
+        const m = String(body || "").match(/https:\/\/(?:github\.com\/user-attachments\/assets\/[0-9a-f-]+|user-images\.githubusercontent\.com\/[^\s)"'<>]+)/i);
+        return m ? m[0] : "";
+      }
+      $("vsload").onclick = async () => {
+        const L = $("vslist");
+        L.textContent = "Loading…";
+        let list;
+        try {
+          const r = await fetch(VS_API + "?labels=video&state=all&per_page=30");
+          if (!r.ok) throw new Error(r.status);
+          list = await r.json();
+        } catch (e) {
+          L.textContent = "Couldn't reach GitHub right now. Try again later.";
+          return;
+        }
+        L.textContent = "";
+        list = list.filter((i) => !i.pull_request);
+        if (!list.length) return (L.textContent = "No shared videos yet.");
+        list.forEach((i) => {
+          const d = document.createElement("div"),
+            link = vsLink(i.body);
+          d.style.cssText = "margin:10px 0;padding:8px;border-radius:8px;background:rgba(127,127,127,.12)";
+          const h = document.createElement("b");
+          h.textContent = String(i.title || "").replace(/^🎬\s*Video:\s*/, "");
+          d.appendChild(h);
+          if (link) {
+            const v = document.createElement("video");
+            v.controls = true;
+            v.playsInline = true;
+            v.preload = "metadata";
+            v.src = link;
+            v.style.cssText = "display:block;max-width:100%;max-height:240px;margin:6px 0;border-radius:6px;background:#000";
+            d.appendChild(v);
+          }
+          const row = document.createElement("div");
+          row.className = "row";
+          const o = document.createElement("a");
+          o.className = "golink";
+          o.href = i.html_url;
+          o.target = "_blank";
+          o.rel = "noopener noreferrer";
+          o.textContent = "Open on GitHub ↗";
+          row.appendChild(o);
+          if (link) {
+            const c = document.createElement("button");
+            c.textContent = "📋 Copy link";
+            c.onclick = async () => {
+              try {
+                await navigator.clipboard.writeText(link);
+                c.textContent = "Copied ✓";
+              } catch (e) {
+                prompt("Copy this link:", link);
+              }
+            };
+            row.appendChild(c);
+          } else {
+            const n = document.createElement("span");
+            n.className = "lbl";
+            n.textContent = "No video file in it";
+            row.appendChild(n);
+          }
+          d.appendChild(row);
+          L.appendChild(d);
+        });
+      };
       function go(v) {
         if (v && upgLocked(v)) {
           upgNeed = v;
