@@ -1125,7 +1125,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.83</div>
+      <div id="studiover">Version 7.93</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1262,7 +1262,8 @@
             <button id="fcp" title="Copy these frames, on every layer (Ctrl + C)">📋 Copy frames</button
             ><label class="sl" style="flex: 0 0 auto">from<input type="number" id="fcpa" min="1" style="width: 72px" /></label
             ><label class="sl" style="flex: 0 0 auto">to<input type="number" id="fcpb" min="1" style="width: 72px" /></label
-            ><button id="fpst" title="Paste the copied frames right after this frame (Ctrl + V)" disabled>📌 Paste after this frame</button>
+            ><button id="fpst" title="Paste the copied frames right after this frame (Ctrl + V)" disabled>📌 Paste after this frame</button
+            ><button id="floop" title="While on, play goes round and round just the picked (blue) frames (L)">🔁 Loop picked frames</button>
             <span id="fcpmsg" class="lbl"></span>
           </div>
         </div>
@@ -3503,6 +3504,8 @@
         clearInterval(timer);
         audioStop();
         if (on) {
+          const lp = loopRange();
+          if (lp && (cur < lp[0] || cur > lp[1])) cur = lp[0]; /* looping: start inside the picked frames */
           audioPlay(cur);
           audT0 = performance.now() - (cur / (+$("fps").value || 8)) * 1000;
         }
@@ -3510,6 +3513,20 @@
           timer = setInterval(
             () => {
               tickAt = performance.now();
+              const lp = loopRange();
+              if (lp) {
+                /* looping the picked frames: after the last one, back to the first (the sound starts from there again) */
+                if (cur < lp[0] || cur >= lp[1]) {
+                  cur = lp[0];
+                  audioStop();
+                  audioPlay(cur);
+                  audT0 = performance.now() - (cur / (+$("fps").value || 8)) * 1000;
+                } else cur++;
+                sel = -1;
+                ui();
+                bkPlayFrame(cur + 1);
+                return;
+              }
               cur = (cur + 1) % frames.length;
               sel = -1;
               /* back at frame 1: start the sound again, but only once all of it has played (a sound longer than the
@@ -3603,6 +3620,25 @@
         $("fcpmsg").textContent = "Pasted " + n + " frame" + (n === 1 ? "" : "s") + " after frame " + at + ".";
         nav(at);
       }
+      /* 🔁 loop the picked frames while playing (Edit video) */
+      let LOOPSEL = false;
+      try {
+        LOOPSEL = localStorage.getItem("oss_loopsel") === "1";
+      } catch (e) {}
+      const loopRange = () => (LOOPSEL && view === "edit" && TLSEL && TLSEL[1] > TLSEL[0] ? TLSEL : null);
+      function loopUi() {
+        $("floop").classList.toggle("on", LOOPSEL);
+        $("floop").textContent = LOOPSEL ? "🔁 Looping picked frames" : "🔁 Loop picked frames";
+      }
+      $("floop").onclick = () => {
+        LOOPSEL = !LOOPSEL;
+        try {
+          localStorage.setItem("oss_loopsel", LOOPSEL ? "1" : "0");
+        } catch (e) {}
+        loopUi();
+        if (LOOPSEL && !(TLSEL && TLSEL[1] > TLSEL[0])) $("fcpmsg").textContent = "Drag across the timeline to pick the frames to loop.";
+      };
+      loopUi();
       $("fcp").onclick = frCopy;
       $("fpst").onclick = frPaste;
       $("fdel").onclick = () => {
@@ -3643,7 +3679,7 @@
         d.id = "keyshelp";
         d.innerHTML =
           "<b>Keyboard shortcuts</b><table>" +
-          [["Space", "Play / stop"], ["← →", "Previous / next frame"], ["Shift + ← →", "Back / forward 10 frames"], ["Home / End", "First / last frame"], ["[ / ]", "Previous / next marker"], ["↑ ↓  or  + −", "Zoom the timeline in / out (Edit video)"], ["Ctrl + C / Ctrl + V", "Copy / paste frames (Edit video)"], ["Ctrl + Z", "Undo"], ["Ctrl + Shift + Z", "Redo"], ["?", "Show or hide this list"]]
+          [["Space", "Play / stop"], ["← →", "Previous / next frame"], ["Shift + ← →", "Back / forward 10 frames"], ["Home / End", "First / last frame"], ["[ / ]", "Previous / next marker"], ["L", "Loop the picked frames on / off (Edit video)"], ["↑ ↓  or  + −", "Zoom the timeline in / out (Edit video)"], ["Ctrl + C / Ctrl + V", "Copy / paste frames (Edit video)"], ["Ctrl + Z", "Undo"], ["Ctrl + Shift + Z", "Redo"], ["?", "Show or hide this list"]]
             .map(([k, t]) => "<tr><td><kbd>" + k + "</kbd></td><td>" + t + "</td></tr>")
             .join("") +
           "</table><small>Tap anywhere to close</small>";
@@ -3687,6 +3723,9 @@
           /* ↑ / ↓ (next to ← →) or + / − zoom the timeline */
           e.preventDefault();
           tlZoom(e.key === "-" || e.key === "_" || e.key === "ArrowDown" ? -1 : 1);
+        } else if (view === "edit" && (e.key === "l" || e.key === "L")) {
+          e.preventDefault();
+          $("floop").click();
         } else if (e.key === "[" || e.key === "]") {
           e.preventDefault();
           markJump(e.key === "]" ? 1 : -1);
