@@ -119,6 +119,13 @@
       #welcome .wgo.alt { background: rgba(255, 255, 255, 0.18); color: #fff; }
       #welcome small { display: block; margin-top: 10px; opacity: 0.85; }
       #welcome kbd { padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.2); font: 700 12px system-ui, sans-serif; }
+      /* Watch video fullscreen: the video fills the screen on black, the buttons float at the bottom and hide when the mouse rests */
+      .v-watch:fullscreen { background: #000; display: flex; align-items: center; justify-content: center; padding: 0; margin: 0; }
+      .v-watch:fullscreen #wc { width: min(100vw, calc(100vh * 16 / 9)); max-width: none; border: 0; border-radius: 0; }
+      .v-watch:fullscreen > .row { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); margin: 0; padding: 8px 12px; border-radius: 14px; background: rgba(20, 20, 24, 0.72); color: #fff; flex-wrap: nowrap; transition: opacity 0.35s; }
+      .v-watch:fullscreen > .vlen { position: fixed; top: 12px; left: 16px; width: max-content; margin: 0; color: #fff; background: rgba(20, 20, 24, 0.6); padding: 4px 10px; border-radius: 10px; transition: opacity 0.35s; }
+      .v-watch.wfidle:fullscreen { cursor: none; }
+      .v-watch.wfidle:fullscreen > .row, .v-watch.wfidle:fullscreen > .vlen { opacity: 0; pointer-events: none; }
       #wclose { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 14px; cursor: pointer; }
       @media (hover: none) { #welcome .wkeys { display: none; } }
       .blk {
@@ -1129,7 +1136,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 8.16</div>
+      <div id="studiover">Version 8.26</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1191,7 +1198,8 @@
         <canvas id="wc" width="640" height="360"></canvas>
         <div class="row">
           <button id="wfirst">⏮</button><button id="wprev">‹</button><button id="wflag" class="g">▶</button
-          ><button id="wnext">›</button><button id="wlast">⏭</button><b id="wfl"></b>
+          ><button id="wnext">›</button><button id="wlast">⏭</button><b id="wfl"></b
+          ><button id="wfull" title="Fullscreen (F). Esc to leave">⛶ Fullscreen</button>
         </div>
       </div>
 
@@ -3714,7 +3722,7 @@
         d.id = "keyshelp";
         d.innerHTML =
           "<b>Keyboard shortcuts</b><table>" +
-          [["Space", "Play / stop"], ["← →", "Previous / next frame"], ["Shift + ← →", "Back / forward 10 frames"], ["Home / End", "First / last frame"], ["[ / ]", "Previous / next marker"], ["L", "Loop the picked frames on / off (Edit video)"], ["↑ ↓  or  + −", "Zoom the timeline in / out (Edit video)"], ["Ctrl + C / Ctrl + V", "Copy / paste frames (Edit video)"], ["Ctrl + Z", "Undo"], ["Ctrl + Shift + Z", "Redo"], ["?", "Show or hide this list"]]
+          [["Space", "Play / stop"], ["← →", "Previous / next frame"], ["Shift + ← →", "Back / forward 10 frames"], ["Home / End", "First / last frame"], ["[ / ]", "Previous / next marker"], ["F", "Fullscreen (Watch video)"], ["L", "Loop the picked frames on / off (Edit video)"], ["↑ ↓  or  + −", "Zoom the timeline in / out (Edit video)"], ["Ctrl + C / Ctrl + V", "Copy / paste frames (Edit video)"], ["Ctrl + Z", "Undo"], ["Ctrl + Shift + Z", "Redo"], ["?", "Show or hide this list"]]
             .map(([k, t]) => "<tr><td><kbd>" + k + "</kbd></td><td>" + t + "</td></tr>")
             .join("") +
           "</table><small>Tap anywhere to close</small>";
@@ -3744,6 +3752,11 @@
         if (e.key === "?") {
           e.preventDefault();
           keysHelp();
+          return;
+        }
+        if (view === "watch" && (e.key === "f" || e.key === "F")) {
+          e.preventDefault();
+          wfToggle();
           return;
         }
         if (!KEYS_PLAY.includes(view)) return;
@@ -10598,6 +10611,33 @@
         document.querySelectorAll(".vlen").forEach((e) => (e.textContent = t));
       }
       /* the length shows on every editor page too (Joel's list), at the top of the page's first panel */
+      /* ===== Watch video fullscreen (⛶ button, F key, double-tap the video; Esc leaves). The buttons hide after 2.5 s
+         without the mouse moving while it plays. ===== */
+      const WV = document.querySelector(".v-watch");
+      let wfT = 0;
+      function wfPoke() {
+        WV.classList.remove("wfidle");
+        clearTimeout(wfT);
+        if (document.fullscreenElement === WV) wfT = setTimeout(() => playing && WV.classList.add("wfidle"), 2500);
+      }
+      function wfToggle() {
+        if (document.fullscreenElement === WV) return document.exitFullscreen().catch(() => {});
+        if (!WV.requestFullscreen) return;
+        WV.requestFullscreen().catch(() => {
+          $("wfl").title = "This browser or page doesn't allow fullscreen here.";
+        });
+      }
+      $("wfull").onclick = wfToggle;
+      $("wc").addEventListener("dblclick", wfToggle);
+      ["pointermove", "pointerdown", "keydown"].forEach((t) => WV.addEventListener(t, wfPoke));
+      document.addEventListener("fullscreenchange", () => {
+        const on = document.fullscreenElement === WV;
+        $("wfull").textContent = on ? "✕ Leave fullscreen" : "⛶ Fullscreen";
+        wfPoke();
+      });
+      setInterval(() => {
+        if (document.fullscreenElement === WV && !playing) WV.classList.remove("wfidle");
+      }, 500);
       const VLEN_VIEWS = ["zipper", "etext", "watch", "camera", "edit", "naming", "audio", "scenery", "effects", "menucust", "export"];
       VLEN_VIEWS.forEach((v) => {
         const box = document.querySelector(".v-" + v);
