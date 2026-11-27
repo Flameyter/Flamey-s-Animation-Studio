@@ -1125,7 +1125,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.72</div>
+      <div id="studiover">Version 7.73</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -3219,8 +3219,9 @@
             if (moved && mv && TLDST != null) {
               /* drop the picked block where the outline is */
               const n = TLSEL[1] - TLSEL[0] + 1,
-                from = TLSEL[0],
-                to = frMove(from, n, TLDST);
+                from = TLSEL[0];
+              if (TLDST !== from) tlPush();
+              const to = frMove(from, n, TLDST);
               TLDST = null;
               TLSEL = [to, to + n - 1];
               $("fcpa").value = to + 1;
@@ -3499,11 +3500,13 @@
         ui();
       };
       $("fcopy").onclick = () => {
+        tlPush();
         LAY.forEach((L) => L.k.splice(cur + 1, 0, clone(L.k[cur])));
         camInsert(cur + 1);
         nav(cur + 1);
       };
       $("fblank").onclick = () => {
+        tlPush();
         LAY.forEach((L, li) =>
           L.k.splice(cur + 1, 0, li === ac ? { items: [], texts: [], layer: null } : clone(L.k[cur])),
         );
@@ -3528,6 +3531,7 @@
       }
       function frPaste() {
         if (!FCLIP) return;
+        tlPush();
         const at = cur + 1,
           n = FCLIP.n;
         LAY.forEach((L) => {
@@ -3547,6 +3551,7 @@
       $("fcp").onclick = frCopy;
       $("fpst").onclick = frPaste;
       $("fdel").onclick = () => {
+        if (frames.length > 1) tlPush();
         if (TLSEL && TLSEL[1] > TLSEL[0]) {
           /* picked frames: delete them all (always leave at least one frame) */
           const [a, b] = TLSEL,
@@ -9631,6 +9636,7 @@
         if (!skip) $("lname").value = LAY[ac].n;
       }
       $("ladd").onclick = () => {
+        tlPush();
         LAY.splice(ac + 1, 0, {
           id: Math.max(0, ...LAY.map((L) => L.id || 0)) + 1,
           n: "Layer " + LAY.length,
@@ -9644,6 +9650,7 @@
         ui();
       };
       $("ldup").onclick = () => {
+        tlPush();
         const L = LAY[ac];
         LAY.splice(ac + 1, 0, {
           id: Math.max(0, ...LAY.map((q) => q.id || 0)) + 1,
@@ -9660,6 +9667,7 @@
       };
       $("ldel").onclick = () => {
         if (LAY.length < 2) return;
+        tlPush();
         LAY.splice(ac, 1);
         ac = Math.min(ac, LAY.length - 1);
         frames = LAY[ac].k;
@@ -9669,6 +9677,7 @@
       };
       $("lup").onclick = () => {
         if (ac < LAY.length - 1) {
+          tlPush();
           [LAY[ac], LAY[ac + 1]] = [LAY[ac + 1], LAY[ac]];
           ac++;
           layUi();
@@ -9676,6 +9685,7 @@
       };
       $("ldn").onclick = () => {
         if (ac > 0) {
+          tlPush();
           [LAY[ac], LAY[ac - 1]] = [LAY[ac - 1], LAY[ac]];
           ac--;
           layUi();
@@ -14686,12 +14696,44 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
         HR = [],
         pre = null;
       const sigF = (f) => JSON.stringify([f.items, f.texts]) + "|" + (f.v || 0);
+      /* undo for frame and layer changes (add, delete, paste, move, duplicate…): the whole timeline is kept as it was
+         (the frames themselves are shared, not copied, so this is cheap) */
+      function tlSnap() {
+        return { tl: true, lays: LAY.map((L) => ({ L, id: L.id, n: L.n, vis: L.vis, k: L.k.slice() })), cam: CAM.slice(), mark: MARK.map((m) => ({ ...m })), cur, ac };
+      }
+      let tlGen = 0;
+      function tlPush() {
+        pre = null; /* this change is not a drawing on one frame */
+        tlGen++;
+        HU.push(tlSnap());
+        if (HU.length > 30) HU.shift();
+        HR = [];
+      }
+      function tlRestore(h) {
+        LAY = h.lays.map((o) => {
+          const L = o.L;
+          L.n = o.n;
+          L.vis = o.vis;
+          L.k = o.k.slice();
+          return L;
+        });
+        CAM = h.cam.slice();
+        MARK = h.mark.map((m) => ({ ...m }));
+        ac = Math.min(h.ac, LAY.length - 1);
+        frames = LAY[ac].k;
+        cur = Math.min(h.cur, frames.length - 1);
+        sel = -1;
+        TLSEL = null;
+        dirty = true;
+        layUi();
+        ui();
+      }
       document.addEventListener(
         "pointerdown",
         (e) => {
           if (view === "edit" && e.target.closest && e.target.closest(".v-edit") && !e.target.closest("#uu,#ur")) {
             const f = F();
-            pre = { id: LAY[ac].id, fi: cur, f: clone(f), sg: sigF(f) };
+            pre = { id: LAY[ac].id, fi: cur, f: clone(f), sg: sigF(f), g: tlGen };
           }
         },
         true,
@@ -14704,6 +14746,7 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
           pre = null;
           if (!p) return;
           setTimeout(() => {
+            if (p.g !== tlGen) return; /* the timeline changed (frames added, deleted, moved…): that has its own undo step */
             const L = LAY.find((L) => L.id === p.id),
               f = L && L.k[p.fi];
             if (f && sigF(f) !== p.sg) {
@@ -14723,6 +14766,12 @@ camSlide("cama", (v, R) => camSet({ x: R.x, y: R.y, w: R.w, h: R.h, a: v }));
       function undoRedo(from, to) {
         const h = from.pop();
         if (!h) return;
+        if (h.tl) {
+          to.push(tlSnap());
+          tlGen++;
+          tlRestore(h);
+          return;
+        }
         const L = LAY.find((L) => L.id === h.id);
         if (!L || !L.k[h.fi]) return;
         to.push({ id: h.id, fi: h.fi, f: clone(L.k[h.fi]), sg: "" });
