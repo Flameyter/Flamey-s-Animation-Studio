@@ -385,6 +385,8 @@
       #cells .trow.tnum .cell { position: relative; overflow: visible; }
       #cells .cell.rsel { background: rgba(76, 151, 255, 0.28); }
       #cells .cell.rsel.cur { background: rgba(255, 102, 128, 0.45); }
+      #cells .cell.rdst { box-shadow: inset 0 2px 0 #ffbf00, inset 0 -2px 0 #ffbf00; } /* where dragged frames will land */
+      #cells .cell.rsel { cursor: grab; }
       .trow.tmark .tlab { cursor: default; color: #ffbf00; }
       .tmk { position: absolute; top: 3px; height: 18px; padding: 0 6px 0 5px; border-left: 2px solid #ffbf00; background: rgba(255, 191, 0, 0.18); color: #ffd666; font: 600 11px/18px system-ui, sans-serif; white-space: nowrap; border-radius: 0 6px 6px 0; cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
       .tmk.on { background: #ffbf00; color: #222; }
@@ -1123,7 +1125,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.62</div>
+      <div id="studiover">Version 7.72</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -3140,7 +3142,32 @@
       /* the Edit video timeline. Only the frames that can be seen (and some on each side) are drawn, with empty space for the
          rest, so even tens of thousands of frames stay fast; scrolling draws the new ones. */
       let tlWin = [0, 0],
-        TLSEL = null; /* frames picked by dragging across the timeline: [first, last] */
+        TLSEL = null, /* frames picked by dragging across the timeline: [first, last] */
+        TLDST = null; /* while dragging the picked block: the frame it would start at */
+      /* move frames [a, a+n) so they start at frame `to` (on every layer, with their cameras and markers) */
+      function frMove(a, n, to) {
+        const N = frames.length;
+        to = Math.max(0, Math.min(N - n, to));
+        if (to === a) return a;
+        LAY.forEach((L) => {
+          const blk = L.k.splice(a, n);
+          L.k.splice(to, 0, ...blk);
+        });
+        while (CAM.length < N) CAM.push(null);
+        const cb = CAM.splice(a, n);
+        CAM.splice(to, 0, ...cb);
+        const ord = [...Array(N).keys()],
+          ob = ord.splice(a, n);
+        ord.splice(to, 0, ...ob);
+        const where = [];
+        ord.forEach((old, now) => (where[old] = now));
+        MARK.forEach((m) => {
+          if (where[m.f] != null) m.f = where[m.f];
+        });
+        if (where[cur] != null) cur = where[cur];
+        dirty = true;
+        return to;
+      }
       /* drag across the timeline to pick frames: they fill Copy frames' from / to boxes. A plain tap still goes to that frame. */
       {
         let st = null,
@@ -3149,18 +3176,31 @@
           const c = document.elementsFromPoint(x, y).find((n) => n.classList && n.classList.contains("cell") && n.dataset.i != null);
           return c ? +c.dataset.i : null;
         };
+        let mv = false; /* true: dragging the picked block to a new place */
         $("cells").addEventListener("pointerdown", (e) => {
           if (e.button > 0) return;
           const i = idxAt(e.clientX, e.clientY);
           if (i == null) return;
           st = i;
           moved = false;
+          mv = !!(TLSEL && i >= TLSEL[0] && i <= TLSEL[1]);
         });
         window.addEventListener("pointermove", (e) => {
           if (st == null || !(e.buttons & 1)) return;
           const i = idxAt(e.clientX, Math.max(e.clientY, 0));
           if (i == null || (!moved && i === st)) return;
           moved = true;
+          if (mv) {
+            /* show where the block would land */
+            const n = TLSEL[1] - TLSEL[0] + 1,
+              to = Math.max(0, Math.min(frames.length - n, TLSEL[0] + (i - st)));
+            if (to !== TLDST) {
+              TLDST = to;
+              $("fcpmsg").textContent = "Let go to move frames " + (TLSEL[0] + 1) + " to " + (TLSEL[1] + 1) + " so they start at frame " + (to + 1) + ".";
+              cells(true);
+            }
+            return;
+          }
           const a = Math.min(st, i),
             b = Math.max(st, i);
           if (!TLSEL || TLSEL[0] !== a || TLSEL[1] !== b) {
@@ -3176,6 +3216,18 @@
           "pointerup",
           (e) => {
             if (st == null) return;
+            if (moved && mv && TLDST != null) {
+              /* drop the picked block where the outline is */
+              const n = TLSEL[1] - TLSEL[0] + 1,
+                from = TLSEL[0],
+                to = frMove(from, n, TLDST);
+              TLDST = null;
+              TLSEL = [to, to + n - 1];
+              $("fcpa").value = to + 1;
+              $("fcpb").value = to + n;
+              $("fcpmsg").textContent = to === from ? "Frames stayed where they were." : "Moved " + n + " frame" + (n === 1 ? "" : "s") + " to start at frame " + (to + 1) + ".";
+              ui();
+            }
             if (moved) {
               /* a drag is not a tap: don't jump to the frame under the finger */
               const stop = (ev) => {
@@ -3190,6 +3242,8 @@
               markUi();
             }
             st = null;
+            mv = false;
+            TLDST = null;
           },
           true,
         );
@@ -3257,7 +3311,7 @@
         for (let i = a; i < b; i++) {
           const f = frames[i],
             d = document.createElement("div");
-          d.className = "cell" + (i === cur ? " cur" : "") + (f.tw ? " tw" : "") + (TLSEL && i >= TLSEL[0] && i <= TLSEL[1] ? " rsel" : "");
+          d.className = "cell" + (i === cur ? " cur" : "") + (f.tw ? " tw" : "") + (TLSEL && i >= TLSEL[0] && i <= TLSEL[1] ? " rsel" : "") + (TLDST != null && i >= TLDST && i < TLDST + TLSEL[1] - TLSEL[0] + 1 ? " rdst" : "");
           d.dataset.i = i;
           d.innerHTML = "<span>" + ((i + 1) % every === 0 || i === 0 ? i + 1 : "") + "</span>";
           d.onclick = () => nav(i);
@@ -3280,7 +3334,7 @@
           for (let i = a; i < Math.min(b, K.length); i++) {
             const f = K[i],
               d = document.createElement("div");
-            d.className = "cell" + (i === cur ? " cur" : "") + (f.items.length || f.texts.length || f.layer ? " has" : "") + (TLSEL && i >= TLSEL[0] && i <= TLSEL[1] ? " rsel" : "");
+            d.className = "cell" + (i === cur ? " cur" : "") + (f.items.length || f.texts.length || f.layer ? " has" : "") + (TLSEL && i >= TLSEL[0] && i <= TLSEL[1] ? " rsel" : "") + (TLDST != null && i >= TLDST && i < TLDST + TLSEL[1] - TLSEL[0] + 1 ? " rdst" : "");
             d.dataset.i = i;
             d.innerHTML = "<i></i>";
             d.onclick = () => {
