@@ -1125,7 +1125,7 @@
       <div id="rmsg" class="lbl" style="margin-top: 14px">Your work saves automatically.</div>
       <button id="newp" style="margin-top: 6px">Start a new project</button>
       <!-- the studio's version: +0.1 for a big round of new things, +0.01 for a round of fixes -->
-      <div id="studiover">Version 7.73</div>
+      <div id="studiover">Version 7.83</div>
     </div>
 
     <div id="bar" class="bar" hidden>
@@ -1236,6 +1236,15 @@
             ><button id="next">›</button><button id="last">⏭</button><b id="fl">1 / 1</b
             ><label class="sl">FPS<input type="number" id="fps" min="0.1" max="30" step="0.1" value="8" /></label
             ><button id="onion" class="on">Onion</button
+            ><select id="onmode" title="How many frames the onion skin shows (red = before, blue = after)" style="flex: 0 0 auto; width: auto">
+              <option value="1,0,0">1 back (plain)</option>
+              <option value="1,0,1">1 back</option>
+              <option value="2,0,1">2 back</option>
+              <option value="3,0,1">3 back</option>
+              <option value="1,1,1">1 back + 1 ahead</option>
+              <option value="2,1,1">2 back + 1 ahead</option>
+              <option value="3,2,1">3 back + 2 ahead</option>
+            </select
             ><button id="hbpshow" title="Show the hitbox point (drag it to read x and y)" hidden>⌖ Show point</button
             ><button id="hbphide" title="Hide the hitbox point" hidden>⌖ Hide point</button
             ><button id="twgo" title="Tween on: move an asset on a later frame and the frames in between fill in so it glides">Tween: Off</button
@@ -2901,6 +2910,52 @@
           });
         x.drawImage(cur, -w / 2, -h / 2, w, h);
       }
+      /* onion skin: frames before this one (red) and after it (blue), fainter the further away; "plain" is the old look */
+      let ONION = [1, 0, 0];
+      try {
+        const s = localStorage.getItem("oss_onion");
+        if (s && /^\d,\d,\d$/.test(s)) ONION = s.split(",").map(Number);
+      } catch (e) {}
+      let onCv = null;
+      function onionDraw(x, i) {
+        const [back, ahead, tint] = ONION,
+          list = [];
+        for (let k = back; k >= 1; k--) if (i - k >= 0) list.push([frames[i - k], k, "#ff3b3b"]);
+        for (let k = ahead; k >= 1; k--) if (i + k < frames.length) list.push([frames[i + k], k, "#2f7bff"]);
+        if (!list.length) return;
+        if (!tint) {
+          list.forEach(([f, k]) => drawFrame(x, f, 0.3 / k));
+          return;
+        }
+        /* each frame is drawn on its own, coloured, then laid faintly over the picture */
+        const W = x.canvas.width,
+          H = x.canvas.height;
+        if (!onCv || onCv.width !== W || onCv.height !== H) {
+          onCv = document.createElement("canvas");
+          onCv.width = W;
+          onCv.height = H;
+        }
+        const o = onCv.getContext("2d"),
+          m = x.getTransform();
+        list.forEach(([f, k, col]) => {
+          o.setTransform(1, 0, 0, 1, 0, 0);
+          o.globalCompositeOperation = "source-over";
+          o.globalAlpha = 1;
+          o.clearRect(0, 0, W, H);
+          o.setTransform(m);
+          drawFrame(o, f, 1);
+          o.setTransform(1, 0, 0, 1, 0, 0);
+          o.globalAlpha = 0.75;
+          o.globalCompositeOperation = "source-atop";
+          o.fillStyle = col;
+          o.fillRect(0, 0, W, H);
+          x.save();
+          x.setTransform(1, 0, 0, 1, 0, 0);
+          x.globalAlpha = 0.42 / k;
+          x.drawImage(onCv, 0, 0);
+          x.restore();
+        });
+      }
       function drawFrame(x, f, al) {
         x.globalAlpha = al;
         if (f.layer) x.drawImage(f.layer, 0, 0);
@@ -3050,7 +3105,7 @@
         if (!raw || x === g) ptDraw(x); /* Blocks: particles (Edit video shows them too) */
         if (x === g || x === wg) hbDraw(x); /* Blocks: hitboxes show in Edit video and Watch video only, never in a downloaded video */
         if (x === g) hbPointDraw(x); /* the draggable hitbox point (Edit video only) */
-        if (on && i > 0) drawFrame(x, frames[i - 1], 0.3);
+        if (on) onionDraw(x, i);
         x.restore();
         if (!raw) {
           const gf = FX.filter((f) => f.layer === "all" && fxOn(f, i));
@@ -3641,6 +3696,14 @@
           nav(e.key === "Home" ? 0 : frames.length - 1);
         }
       });
+      $("onmode").value = ONION.join(",");
+      $("onmode").onchange = () => {
+        ONION = $("onmode").value.split(",").map(Number);
+        try {
+          localStorage.setItem("oss_onion", ONION.join(","));
+        } catch (e) {}
+        if (!onion) $("onion").click(); /* picking a kind turns the onion skin on */
+      };
       $("onion").onclick = () => {
         onion = !onion;
         $("onion").classList.toggle("on", onion);
